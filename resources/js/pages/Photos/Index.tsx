@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
 
 import { FilePond, registerPlugin } from 'react-filepond';
 import type { FilePondFile } from 'filepond';
@@ -124,6 +124,34 @@ export default function Index() {
         
         closeImgEditor();
     };
+
+    const [photos, setPhotos] = useState<Array<{
+        name: string;
+        path: string;
+        url: string;
+        size: number;
+        last_modified: number;
+    }>>([]);
+
+    const fetchPhotos = async () => {
+        try {
+            const response = await fetch('/photos/all');
+            const data = await response.json();
+            
+            if (data.success) {
+                setPhotos(data.photos);
+            } else {
+                console.error('Failed to fetch photos:', data.message);
+            }
+        } catch (error) {
+            console.error('Error fetching photos:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchPhotos();
+    }, []);
+
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -271,6 +299,23 @@ export default function Index() {
                             </div>
                         </div>
                     )}
+                    
+                    {/* Photo Gallery */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-8">
+                        {photos.map((photo) => (
+                            <div key={photo.path} className="relative group">
+                                <img 
+                                    src={photo.url}
+                                    alt={photo.name}
+                                    className="w-full h-48 object-cover rounded-lg cursor-pointer"
+                                    onClick={() => openImgEditor(photo.url)}
+                                />
+                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <p className="text-sm truncate">{photo.name}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </AppLayout>

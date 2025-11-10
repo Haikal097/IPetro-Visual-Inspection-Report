@@ -18,10 +18,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 
     Route::get( '/photo',[PhotoController::class, 'index'])->name('photo.index');
+    Route::post('/upload', [PhotoController::class, 'store'])->name('upload');
+    Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage'])->name('save.edited.image');
+    Route::delete('/upload', [PhotoController::class, 'destroy'])->name('upload.destroy');
+    Route::get('/photos/temp/{filename}', [PhotoController::class, 'getTempUrl'])->name('photos.temp-url');
+    Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
 });
 
-Route::post('/upload', [PhotoController::class, 'store'])->name('upload');
-Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage'])->name('save.edited.image');
-Route::delete('/upload', [PhotoController::class, 'destroy'])->name('upload.destroy');
 
 require __DIR__.'/settings.php';

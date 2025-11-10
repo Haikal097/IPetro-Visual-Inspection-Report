@@ -108,4 +108,45 @@ class PhotoController extends Controller
             ], 500);
         }
     }
+
+    public function getTempUrl($filename)
+    {
+        $path = "photos/{$filename}";
+        if (Storage::disk('public')->exists($path)) {
+            $url = Storage::disk('public')->url($path);
+            return response()->json(['url' => $url]);
+        }
+        
+        return response()->json(['error' => 'File not found'], 404);
+    }
+
+    public function getAllPhotos()
+    {
+        try {
+            $files = Storage::disk('public')->files('photos');
+            
+            $photos = [];
+            foreach ($files as $file) {
+                if (in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                    $photos[] = [
+                        'name' => basename($file),
+                        'path' => $file,
+                        'url' => Storage::disk('public')->url($file),
+                        'size' => Storage::disk('public')->size($file),
+                        'last_modified' => Storage::disk('public')->lastModified($file),
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'photos' => $photos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch photos: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
