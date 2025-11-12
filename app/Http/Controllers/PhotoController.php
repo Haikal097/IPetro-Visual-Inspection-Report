@@ -42,37 +42,40 @@ class PhotoController extends Controller
     public function saveEditedImage(Request $request)
     {
         $request->validate([
-            'image' => 'required|string', // base64 image data
+            'image' => 'required|string',
             'filename' => 'required|string',
         ]);
 
         try {
-            // Extract the base64 image data
             $imageData = $request->input('image');
             
-            // Remove the data:image/png;base64, part if present
-            if (strpos($imageData, ';base64,') !== false) {
-                list($type, $imageData) = explode(';', $imageData);
-                list(, $imageData) = explode(',', $imageData);
+            // Extract base64 data and get extension
+            $extension = '.png'; // default extension
+            if (preg_match('/^data:image\/(\w+);base64,/', $imageData, $matches)) {
+                $imageData = substr($imageData, strpos($imageData, ',') + 1);
+                $extension = '.' . $matches[1];
             }
 
-            // Decode the base64 data
             $imageData = base64_decode($imageData);
 
-            // Generate filename
-            $filename = 'edited_' . time() . '_' . $request->input('filename');
+            if ($imageData === false) {
+                throw new \Exception('Invalid base64 image data');
+            }
+
+            $originalName = pathinfo($request->input('filename'), PATHINFO_FILENAME);
+            $filename = 'edited_' . time() . '_' . $originalName . $extension;
             $path = 'photos/edited/' . $filename;
 
-            // Save the image to storage
-            Storage::disk('public')->put($path, $imageData);
-
-            $url = Storage::disk('public')->url($path);
+            // Save to cloud storage (persistent)
+            Storage::disk('s3')->put($path, $imageData, 'public');
+            $url = Storage::disk('s3')->url($path);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Edited image saved successfully!',
                 'path' => $path,
                 'url' => $url,
+                'filename' => $filename,
             ], 200);
 
         } catch (\Exception $e) {
