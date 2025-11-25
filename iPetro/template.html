@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!--Style-->
+
+    <link rel="stylesheet" href="css/base-style.css">
+    <link rel="stylesheet" href="css/home-style.css">
+
+    <title>iPetro - Home</title>
+</head>
+<body>
+    <header class="header">
+        <a href="#">iPetro Reporting System</a>
+        <div>
+            <ul class="navbar">
+                <li><a href="home.php" class="active">Home</a></li>
+                <li><a href="create-report.php">Report</a></li>
+                <li><a href="home.php">Track</a></li>
+                <li><a href="home.php">Check</a></li>
+                <li>
+                <span style="margin-right: 15px;">
+                    Welcome, <?php echo htmlspecialchars($fullName); ?>
+                </span>
+                <a href="logout.php" style="color: #fff; font-weight: 600;">Logout</a>
+                </li>
+            </ul>
+        </div>
+    </header>
+
+    <h2 class="text-center mt-10 mb-1">Welcome to iPetro Report System</h2>
+
+    <div class="container">
+
+    </div>
+</body>
+</html>
+

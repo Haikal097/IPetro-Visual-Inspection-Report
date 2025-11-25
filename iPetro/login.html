@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!--Style-->
+    <link rel="stylesheet" href="css/base-style.css">
+    <link rel="stylesheet" href="css/login-style.css">
+
+    <title>iPetro - Login</title>
+</head>
+<body>
+    <header class="header">
+        <a href="login.html">iPetro Reporting System</a>
+        <div>
+            <ul class="navbar">
+            </ul>
+        </div>
+    </header>
+
+    <div class="login-wrapper">
+        <div class="container login-container">
+            <!-- Login Header -->
+            <div class="login-header">
+                <div class="login-icon">🔐</div>
+                <h1>Welcome Back</h1>
+                <p>Sign in to access your iPetro dashboard</p>
+            </div>
+
+            <!-- Error Message (Hidden by default) -->
+            <div id="errorMessage" class="alert alert-error" style="display: none;">
+                <span class="alert-icon">⚠️</span>
+                <span class="alert-text">Invalid username or password</span>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" action="authenticate.php" method="POST" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            placeholder="Enter your username"
+                            required
+                            autocomplete="username"
+                        >
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            placeholder="Enter your password"
+                            required
+                            autocomplete="current-password"
+                        >
+                        <span class="toggle-password" onclick="togglePassword()">👁️</span>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox" name="remember" id="remember">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="forgot-password.php" class="forgot-password">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <span class="btn-text">Sign In</span>
+                    <span class="btn-loader" style="display: none;">
+                        <span class="spinner"></span>
+                        Signing in...
+                    </span>
+                </button>
+            </form>
+
+            <!-- Additional Links -->
+            <div class="login-footer">
+                <p>Don't have an account? <a href="register.php">Contact Administrator</a></p>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div class="info-section">
+            <div class="info-card">
+                <div class="info-icon">📊</div>
+                <h3>API 510 Compliant</h3>
+                <p>Generate inspection reports that meet industry standards</p>
+            </div>
+            <div class="info-card">
+                <div class="info-icon">⚡</div>
+                <h3>Fast & Efficient</h3>
+                <p>Reduce reporting time by up to 50%</p>
+            </div>
+            <div class="info-card">
+                <div class="info-icon">🔒</div>
+                <h3>Secure Platform</h3>
+                <p>Your inspection data is encrypted and protected</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/login.js"></script>
+</body>
+</html>
