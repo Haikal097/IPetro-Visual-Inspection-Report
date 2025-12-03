@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>iPETRO – Photos Report (API 510 Layout)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- React & Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --accent: #cd202c;
+      --border-dark: #111827;
+      --border-light: #d1d5db;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #111827 0, #020617 55%);
+      min-height: 100vh;
+    }
+
+    .app-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      color: #111827;
+      border-radius: 4px;
+      border: 1px solid var(--border-dark);
+      box-shadow: 0 18px 45px rgba(0,0,0,0.55);
+      padding: 18px 22px 26px;
+    }
+
+    .api-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #111827;
+      font-size: 0.8rem;
+      margin-bottom: 8px;
+    }
+
+    .api-table td {
+      border: 1px solid #111827;
+      padding: 4px 6px;
+      vertical-align: top;
+    }
+
+    .api-logo-cell {
+      width: 80px;
+      text-align: center;
+    }
+
+    .api-logo {
+      max-height: 40px;
+      max-width: 70px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .api-main-title {
+      text-align: center;
+    }
+
+    .api-main-turnaround {
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .api-main-report {
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .api-report-box {
+      font-size: 0.75rem;
+    }
+
+    .api-label {
+      font-weight: 600;
+    }
+
+    .api-input {
+      border: none;
+      border-bottom: 1px solid #9ca3af;
+      font-size: 0.75rem;
+      width: 100%;
+      padding: 1px 2px;
+      outline: none;
+    }
+
+    .api-input:focus {
+      border-bottom-color: var(--accent);
+    }
+
+    .api-band {
+      background: #e5e7eb;
+      text-align: center;
+      font-size: 0.8rem;
+      padding-top: 4px;
+      padding-bottom: 4px;
+    }
+
+    .api-band strong {
+      text-transform: uppercase;
+    }
+
+    .api-band-note {
+      font-size: 0.7rem;
+      margin-top: 2px;
+      color: #4b5563;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 0.78rem;
+    }
+
+    .field label {
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.7rem;
+    }
+
+    .field input,
+    .field textarea,
+    .field select {
+      background: #ffffff;
+      border-radius: 3px;
+      border: 1px solid var(--border-light);
+      padding: 5px 6px;
+      font-size: 0.8rem;
+      color: #111827;
+      resize: vertical;
+      min-height: 30px;
+    }
+
+    textarea { min-height: 60px; }
+
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus {
+      outline: 1px solid var(--accent);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+
+    .upload-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0 12px;
+      font-size: 0.78rem;
+    }
+
+    .upload-row span {
+      color: #4b5563;
+    }
+
+    /* Buttons */
+
+    .btn {
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 3px 9px;
+      font-size: 0.72rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      background: #111827;
+      color: #ffffff;
+    }
+
+    .btn.secondary {
+      background: transparent;
+      border-color: #9ca3af;
+      color: #374151;
+    }
+
+    .btn.small { padding: 2px 8px; font-size: 0.7rem; }
+
+    /* Photo rows like API 510 photos report */
+
+    .photo-row {
+      display: grid;
+      grid-template-columns: minmax(0, 2.4fr) minmax(0, 3fr);
+      gap: 10px;
+      border: 1px solid #111827;
+      margin-bottom: 10px;
+      font-size: 0.78rem;
+    }
+
+    .photo-left,
+    .photo-right {
+      border-right: 1px solid #111827;
+    }
+
+    .photo-right {
+      border-right: none;
+    }
+
+    .photo-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .photo-title-band {
+      background: #111827;
+      color: #ffffff;
+      padding: 3px 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .photo-image-wrap {
+      padding: 6px;
+      border-top: 1px solid #111827;
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+    }
+
+    .photo-image-wrap img {
+      max-width: 100%;
+      max-height: 260px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .photo-right-inner {
+      padding: 6px 8px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .label-strong {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .connection-map {
+      border: 1px solid #111827;
+      padding: 6px 8px;
+      font-size: 0.75rem;
+      margin-top: 8px;
+    }
+
+    .connection-map ul {
+      margin: 4px 0 0;
+      padding-left: 18px;
+    }
+
+    .pill {
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: #e5fbea;
+      color: #166534;
+      font-size: 0.68rem;
+    }
+
+    /* Footer / signatures */
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 0.75rem;
+    }
+
+    .footer-cell {
+      border: 1px solid #111827;
+      padding: 6px 8px 10px;
+    }
+
+    .footer-cell-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .footer-line {
+      border-bottom: 1px solid #9ca3af;
+      margin-top: 16px;
+    }
+
+    .footer-line span {
+      font-size: 0.7rem;
+      color: #4b5563;
+    }
+
+    /* Modal / editor */
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+    }
+
+    .modal {
+      background: #ffffff;
+      border-radius: 10px;
+      border: 1px solid #4b5563;
+      max-width: 980px;
+      width: 100%;
+      max-height: 100%;
+      padding: 14px 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .tools-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+
+    .btn-toggle {
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 0.74rem;
+    }
+
+    .btn-toggle.active {
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+
+    .canvas-wrap {
+      border-radius: 4px;
+      border: 1px solid #374151;
+      background: #000;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    canvas { display: block; }
+
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      color: #4b5563;
+    }
+
+    @media (max-width: 720px) {
+      .photo-row {
+        grid-template-columns: minmax(0,1fr);
+      }
+      .photo-left {
+        border-right: none;
+        border-bottom: 1px solid #111827;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    /* ---------- API510 HEADER (PHOTOS REPORT) ---------- */
+    function HeaderPhotosReport() {
+      const [header, setHeader] = useState({
+        turnaround: "MAJOR TURNAROUND 2025",
+        title: "PRESSURE VESSEL INSPECTION REPORT",
+        equipmentTag: "",
+        equipmentDesc: "Nitrogen / Pressure Vessel",
+        plant: "Plant 1",
+        dosh: "",
+        reportNo: "",
+        reportDate: "",
+      });
+
+      const update = (field, value) =>
+        setHeader(prev => ({ ...prev, [field]: value }));
+
+      return (
+        <table className="api-table">
+          <tbody>
+            <tr>
+              <td className="api-logo-cell">
+                <img src="image_0.png" alt="iPETRO logo" className="api-logo" />
+              </td>
+              <td colSpan="2" className="api-main-title">
+                <div className="api-main-turnaround">{header.turnaround}</div>
+                <div className="api-main-report">{header.title}</div>
+              </td>
+              <td className="api-report-box">
+                <div>
+                  <span className="api-label">Report no.: </span>
+                  <input
+                    className="api-input"
+                    value={header.reportNo}
+                    onChange={e => update("reportNo", e.target.value)}
+                  />
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  <span className="api-label">Report date: </span>
+                  <input
+                    className="api-input"
+                    type="date"
+                    value={header.reportDate}
+                    onChange={e => update("reportDate", e.target.value)}
+                  />
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td colSpan="2">
+                <div>
+                  <span className="api-label">Equipment tag no.: </span>
+                  <input
+                    className="api-input"
+                    value={header.equipmentTag}
+                    onChange={e => update("equipmentTag", e.target.value)}
+                    placeholder="V-002"
+                  />
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  <span className="api-label">Equipment description: </span>
+                  <input
+                    className="api-input"
+                    value={header.equipmentDesc}
+                    onChange={e => update("equipmentDesc", e.target.value)}
+                  />
+                </div>
+              </td>
+              <td colSpan="2">
+                <div>
+                  <span className="api-label">Plant/Unit/Area: </span>
+                  <input
+                    className="api-input"
+                    value={header.plant}
+                    onChange={e => update("plant", e.target.value)}
+                  />
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  <span className="api-label">DOSH registration no.: </span>
+                  <input
+                    className="api-input"
+                    value={header.dosh}
+                    onChange={e => update("dosh", e.target.value)}
+                  />
+                </div>
+              </td>
+            </tr>
+
+            {/* PHOTOS REPORT BAND */}
+            <tr>
+              <td colSpan="4" className="api-band">
+                <strong>PHOTOS REPORT</strong>
+                <div className="api-band-note">
+                  (Each photo below is linked to the relevant finding and recommendation.)
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      );
+    }
+
+    /* ---------- PHOTO EDITOR MODAL ---------- */
+    function PhotoEditorModal({ photo, onSave, onClose }) {
+      const canvasRef = useRef(null);
+      const [imgState, setImgState] = useState(null);
+      const [mode, setMode] = useState("highlight"); // highlight | arrow
+      const [shapes, setShapes] = useState(photo.annotations || []);
+      const [isDrawing, setIsDrawing] = useState(false);
+      const startRef = useRef(null);
+
+      useEffect(() => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const maxWidth = 800;
+          let scale = 1;
+          if (img.width > maxWidth) scale = maxWidth / img.width;
+          const w = img.width * scale;
+          const h = img.height * scale;
+          canvas.width = w;
+          canvas.height = h;
+          setImgState({ img, scale });
+          drawAll(canvas, img, shapes);
+        };
+        img.src = photo.editedUrl || photo.url;
+      }, []);
+
+      useEffect(() => {
+        if (imgState && canvasRef.current) {
+          drawAll(canvasRef.current, imgState.img, shapes);
+        }
+      }, [shapes]);
+
+      const drawAll = (canvas, img, list) => {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        list.forEach(s => {
+          if (s.type === "highlight") drawHighlight(ctx, s);
+          if (s.type === "arrow") drawArrow(ctx, s);
+        });
+      };
+
+      const drawHighlight = (ctx, s) => {
+        ctx.save();
+        ctx.strokeStyle = "rgba(250,204,21,0.96)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6,4]);
+        const x = s.x1;
+        const y = s.y1;
+        const w = s.x2 - s.x1;
+        const h = s.y2 - s.y1;
+        ctx.strokeRect(x, y, w, h);
+        ctx.restore();
+      };
+
+      const drawArrow = (ctx, s) => {
+        const { x1, y1, x2, y2 } = s;
+        const head = 10;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const angle = Math.atan2(dy, dx);
+
+        ctx.save();
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(
+          x2 - head * Math.cos(angle - Math.PI / 6),
+          y2 - head * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.lineTo(
+          x2 - head * Math.cos(angle + Math.PI / 6),
+          y2 - head * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.lineTo(x2, y2);
+        ctx.fillStyle = "#38bdf8";
+        ctx.fill();
+        ctx.restore();
+      };
+
+      const getPos = ev => {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+      };
+
+      const handleDown = ev => {
+        if (!imgState) return;
+        setIsDrawing(true);
+        startRef.current = getPos(ev);
+      };
+
+      const handleMove = ev => {
+        if (!isDrawing || !imgState) return;
+        const start = startRef.current;
+        const cur = getPos(ev);
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext("2d");
+        drawAll(canvas, imgState.img, shapes);
+        const temp = { type: mode, x1: start.x, y1: start.y, x2: cur.x, y2: cur.y };
+        if (mode === "highlight") drawHighlight(ctx, temp);
+        else drawArrow(ctx, temp);
+      };
+
+      const handleUp = ev => {
+        if (!isDrawing || !imgState) return;
+        setIsDrawing(false);
+        const start = startRef.current;
+        const cur = getPos(ev);
+        const dist = Math.hypot(cur.x - start.x, cur.y - start.y);
+        if (dist < 4) return;
+        const newShape = { type: mode, x1: start.x, y1: start.y, x2: cur.x, y2: cur.y };
+        setShapes(prev => [...prev, newShape]);
+      };
+
+      const handleClear = () => setShapes([]);
+
+      const handleSave = () => {
+        if (!canvasRef.current) return;
+        const dataUrl = canvasRef.current.toDataURL("image/png");
+        onSave(photo.id, dataUrl, shapes);
+        onClose();
+      };
+
+      return (
+        <div className="modal-backdrop" onClick={onClose}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>Photo editor – {photo.name || `Photo`}</div>
+              <button className="btn small secondary" onClick={onClose}>Close</button>
+            </div>
+
+            <div className="tools-row">
+              <span style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                Tools
+              </span>
+              <button
+                className={"btn-toggle" + (mode === "highlight" ? " active" : "")}
+                onClick={() => setMode("highlight")}
+              >
+                Highlight (rect)
+              </button>
+              <button
+                className={"btn-toggle" + (mode === "arrow" ? " active" : "")}
+                onClick={() => setMode("arrow")}
+              >
+                Arrow
+              </button>
+              <button className="btn-toggle" onClick={handleClear}>Clear annotations</button>
+              <span style={{ marginLeft: "auto", fontSize: "0.7rem" }}>
+                <span className="pill">
+                  {shapes.length} annotation{shapes.length !== 1 ? "s" : ""}
+                </span>
+              </span>
+            </div>
+
+            <div className="canvas-wrap">
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleDown}
+                onMouseMove={handleMove}
+                onMouseUp={handleUp}
+              />
+            </div>
+
+            <div className="modal-footer">
+              <span>Use highlight for areas and arrow for connections/directions.</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button className="btn small secondary" onClick={handleClear}>
+                  Clear all
+                </button>
+                <button className="btn small" onClick={handleSave}>
+                  Save edited image
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ---------- PHOTO ROW ---------- */
+    function PhotoRow({ photo, index, onChangeField, onOpenEditor }) {
+      return (
+        <div className="photo-row">
+          <div className="photo-left">
+            <div className="photo-title-band">
+              <span>Photo {index}</span>
+              <button className="btn small secondary" onClick={() => onOpenEditor(photo)}>
+                Edit photo
+              </button>
+            </div>
+            <div className="photo-image-wrap">
+              <img src={photo.editedUrl || photo.url} alt={photo.name || `Photo ${index}`} />
+            </div>
+          </div>
+          <div className="photo-right">
+            <div className="photo-right-inner">
+              <div>
+                <div className="label-strong">Finding:</div>
+                <textarea
+                  value={photo.finding}
+                  onChange={e => onChangeField(photo.id, "finding", e.target.value)}
+                  placeholder="Example: 1.1 General view of equipment V-950A facing from south side..."
+                />
+              </div>
+              <div>
+                <div className="label-strong" style={{ marginTop: 4 }}>Recommendation:</div>
+                <textarea
+                  value={photo.recommendation}
+                  onChange={e => onChangeField(photo.id, "recommendation", e.target.value)}
+                  placeholder="Example: 1.1 Nil."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ---------- PHOTOS SECTION (UPLOAD + LIST + EDITOR) ---------- */
+    function PhotosReportSection() {
+      const [photos, setPhotos] = useState([]);
+      const [editingPhoto, setEditingPhoto] = useState(null);
+
+      const handleFileChange = e => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+        setPhotos(prev => [
+          ...prev,
+          ...files.map((file, idx) => ({
+            id: Date.now() + idx,
+            name: file.name,
+            url: URL.createObjectURL(file),
+            editedUrl: null,
+            finding: "",
+            recommendation: "",
+            annotations: []
+          }))
+        ]);
+        e.target.value = "";
+      };
+
+      const changeField = (id, field, value) => {
+        setPhotos(prev => prev.map(p => (p.id === id ? { ...p, [field]: value } : p)));
+      };
+
+      const saveEdited = (id, editedUrl, annotations) => {
+        setPhotos(prev =>
+          prev.map(p => (p.id === id ? { ...p, editedUrl, annotations } : p))
+        );
+      };
+
+      return (
+        <>
+          <div className="upload-row">
+            <input type="file" accept="image/*" multiple onChange={handleFileChange} />
+            <span>Upload final images (original or already annotated).</span>
+          </div>
+
+          {photos.length === 0 && (
+            <p style={{ fontSize: "0.8rem", color: "#4b5563" }}>
+              No photos yet. Upload to start the photos report.
+            </p>
+          )}
+
+          {photos.map((photo, idx) => (
+            <PhotoRow
+              key={photo.id}
+              photo={photo}
+              index={idx + 1}
+              onChangeField={changeField}
+              onOpenEditor={setEditingPhoto}
+            />
+          ))}
+
+          {photos.length > 0 && (
+            <div className="connection-map">
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <strong>Notes</strong>
+                <span className="pill">{photos.length} photo(s)</span>
+              </div>
+              <p style={{ marginTop: 4 }}>
+                Use the finding item numbers (1.1, 2.1, etc.) above so this page can be
+                cross-referenced with the main inspection report.
+              </p>
+            </div>
+          )}
+
+          {editingPhoto && (
+            <PhotoEditorModal
+              photo={editingPhoto}
+              onSave={saveEdited}
+              onClose={() => setEditingPhoto(null)}
+            />
+          )}
+        </>
+      );
+    }
+
+    /* ---------- FOOTER / SIGNATURES ---------- */
+    function FooterSignatures() {
+      const [footer, setFooter] = useState({
+        inspectedBy: "",
+        inspectedDate: "",
+        reviewedBy: "",
+        approvedBy: "",
+        approvedDate: "",
+      });
+
+      const update = (field, value) =>
+        setFooter(prev => ({ ...prev, [field]: value }));
+
+      return (
+        <div className="footer-grid">
+          <div className="footer-cell">
+            <div className="footer-cell-title">Inspected by:</div>
+            <div className="footer-line"></div>
+            <div style={{ marginTop: 2 }}>
+              <span>Name: </span>
+              <input
+                className="api-input"
+                style={{ borderBottom: "1px solid #9ca3af", width: "100%" }}
+                value={footer.inspectedBy}
+                onChange={e => update("inspectedBy", e.target.value)}
+              />
+            </div>
+            <div style={{ marginTop: 4 }}>
+              <span>Date: </span>
+              <input
+                className="api-input"
+                type="date"
+                style={{ borderBottom: "1px solid #9ca3af", width: "100%" }}
+                value={footer.inspectedDate}
+                onChange={e => update("inspectedDate", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="footer-cell">
+            <div className="footer-cell-title">Reviewed by:</div>
+            <div className="footer-line"></div>
+            <div style={{ marginTop: 2 }}>
+              <span>Name: </span>
+              <input
+                className="api-input"
+                style={{ borderBottom: "1px solid #9ca3af", width: "100%" }}
+                value={footer.reviewedBy}
+                onChange={e => update("reviewedBy", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="footer-cell">
+            <div className="footer-cell-title">Approved by (Client):</div>
+            <div className="footer-line"></div>
+            <div style={{ marginTop: 2 }}>
+              <span>Name: </span>
+              <input
+                className="api-input"
+                style={{ borderBottom: "1px solid #9ca3af", width: "100%" }}
+                value={footer.approvedBy}
+                onChange={e => update("approvedBy", e.target.value)}
+              />
+            </div>
+            <div style={{ marginTop: 4 }}>
+              <span>Date: </span>
+              <input
+                className="api-input"
+                type="date"
+                style={{ borderBottom: "1px solid #9ca3af", width: "100%" }}
+                value={footer.approvedDate}
+                onChange={e => update("approvedDate", e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ---------- MAIN APP ---------- */
+    function App() {
+      return (
+        <div className="app-shell">
+          <div className="page">
+            <HeaderPhotosReport />
+            <PhotosReportSection />
+            <FooterSignatures />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
