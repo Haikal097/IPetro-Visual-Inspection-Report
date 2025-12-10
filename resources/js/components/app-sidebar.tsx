@@ -13,7 +13,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Image } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Image, FileText  } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -26,6 +26,11 @@ const mainNavItems: NavItem[] = [
         title: 'Photos',
         href: '/photo',
         icon: Image,
+    },
+    {
+        title: 'Report',
+        href: '/report',
+        icon: FileText,
     },
 ];
 

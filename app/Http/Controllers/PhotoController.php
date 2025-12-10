@@ -67,8 +67,8 @@ class PhotoController extends Controller
             $path = 'photos/edited/' . $filename;
 
             // Save to cloud storage (persistent)
-            Storage::disk('s3')->put($path, $imageData, 'public');
-            $url = Storage::disk('s3')->url($path);
+            Storage::disk('public')->put($path, $imageData, 'public');
+            $url = Storage::disk('public')->url($path);
 
             return response()->json([
                 'success' => true,

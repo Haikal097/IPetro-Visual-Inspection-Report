@@ -5,6 +5,8 @@ use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ReportController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -14,7 +16,7 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
+        return Inertia::render('Dashboard');
     })->name('dashboard');
 
     Route::get( '/photo',[PhotoController::class, 'index'])->name('photo.index');
@@ -23,6 +25,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/upload', [PhotoController::class, 'destroy'])->name('upload.destroy');
     Route::get('/photos/temp/{filename}', [PhotoController::class, 'getTempUrl'])->name('photos.temp-url');
     Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
+    Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
+    Route::get('/report', function () {
+        return inertia('Reports/Index');
+    });
+    Route::get('/pv-report', function () {
+    return Inertia::render('Reports/PVReport');
+});
+
+
 });
 
 
