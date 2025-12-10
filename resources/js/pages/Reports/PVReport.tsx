@@ -1,7 +1,8 @@
 // resources/js/Pages/PVReport.tsx
-import { useState, useEffect, ChangeEvent } from "react";
+import { useState, useRef, useEffect, ChangeEvent } from "react";
+import axios from 'axios';
 import AppLayout from "@/layouts/app-layout";
-import { Head } from "@inertiajs/react";
+import { Head, useForm } from "@inertiajs/react";
 import { 
     Printer, 
     Trash2, 
@@ -25,6 +26,7 @@ import { toast, Toaster } from "react-hot-toast";
 import ipetroLogo from '@/assets/logo.png';
 
 export interface FormState {
+    title?: string; 
     equipmentTag: string;
     equipmentDescription: string;
     equipmentType: string;
@@ -62,6 +64,21 @@ export default function PVReport() {
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [wordCount, setWordCount] = useState<Record<string, number>>({});
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [reportId, setReportId] = useState<number | null>(null);
+
+    const printRef = useRef<HTMLDivElement>(null);
+
+    // In your React component (PVReport.tsx)
+    const api = axios.create({
+        baseURL: '/api', // Use relative path
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+        withCredentials: true,
+    });
 
     // Equipment options
     const EQUIPMENT_OPTIONS = [
@@ -222,27 +239,150 @@ export default function PVReport() {
         }
     };
 
+    // Handle submit for review
+    const handleSubmit = async () => {
+        if (!confirm('Submit this report for review? You will not be able to edit it after submission.')) {
+            return;
+        }
+        
+        setIsSubmitting(true);
+        await handleSave('submitted');
+    };
+
     // Handle save to database
-    const handleSave = async () => {
+    const handleSave = async (status: 'draft' | 'submitted' = 'draft') => {
         setIsSaving(true);
+        
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Validate required fields
+            if (!form.equipmentTag || !form.equipmentType || !form.reportNo) {
+                toast.error('Please complete all required fields');
+                setIsSaving(false);
+                return;
+            }
+
+            // Auto-generate title if empty
+            let title = form.title || '';
+            if (!title.trim()) {
+                title = generateAutoTitle(form);
+            }
+
+            // Prepare the data to match your reports table structure
+            const reportData = {
+                // Store in database column AND json_data
+                title: title, // Store in title column
+                json_data: {
+                    title: title, // Also store in json_data for backup
+                    equipmentTag: form.equipmentTag,
+                    equipmentDescription: form.equipmentDescription,
+                    equipmentType: form.equipmentType,
+                    plantUnitArea: form.plantUnitArea,
+                    doshRegistration: form.doshRegistration,
+                    reportNo: form.reportNo,
+                    reportDate: form.reportDate,
+                    initialFinding: form.initialFinding,
+                    externalFinding: form.externalFinding,
+                    internalFinding: form.internalFinding,
+                    ndt: form.ndt,
+                    recommendations: form.recommendations,
+                },
+                // Fields that go directly into table columns
+                report_no: form.reportNo,
+                status: status,
+            };
+
+            console.log('Sending report data:', reportData);
+
+            let response;
             
-            // In real app, you would send data to your backend
-            // await axios.post('/api/reports', form);
+            if (reportId) {
+                // Update existing report
+                response = await api.put(`/reports/${reportId}`, reportData);
+            } else {
+                // Create new report
+                response = await api.post('/reports', reportData);
+                setReportId(response.data.data.id);
+            }
+
+            if (response.data.success) {
+                // Also save to localStorage as backup
+                localStorage.setItem("ipetro_pv_report", JSON.stringify(form));
+                
+                toast.success(`Report ${status === 'draft' ? 'saved' : 'submitted'} successfully!`, {
+                    icon: status === 'draft' ? '💾' : '📤',
+                    duration: 3000,
+                });
+                
+                if (status === 'submitted') {
+                    // Clear local storage after submission
+                    localStorage.removeItem("ipetro_pv_report");
+                    // Optionally reset form
+                    setForm(getInitialFormState());
+                    setReportId(null);
+                }
+            }
+        } catch (error: any) {
+            console.error('Save error:', error);
             
-            toast.success('Report saved successfully!', {
-                icon: '💾',
-                duration: 3000,
-            });
-        } catch (error) {
-            toast.error('Failed to save report');
+            if (error.response?.status === 422) {
+                const errors = error.response.data.errors;
+                Object.keys(errors).forEach(key => {
+                    toast.error(errors[key][0]);
+                });
+            } else if (error.response?.status === 403) {
+                toast.error('You are not authorized to perform this action');
+            } else {
+                toast.error('Failed to save report. Please try again.');
+            }
         } finally {
             setIsSaving(false);
+            if (status === 'submitted') setIsSubmitting(false);
         }
     };
 
+// Helper function to generate title
+const generateAutoTitle = (formData: FormState): string => {
+    const parts: string[] = [];
+    
+    // Add equipment type
+    if (formData.equipmentType && formData.equipmentType !== "Select equipment type..." && formData.equipmentType !== "") {
+        parts.push(formData.equipmentType);
+    }
+    
+    // Add equipment tag
+    if (formData.equipmentTag) {
+        parts.push(formData.equipmentTag);
+    }
+    
+    // Add report number
+    if (formData.reportNo) {
+        parts.push(`(${formData.reportNo})`);
+    }
+    
+    // Add date
+    if (formData.reportDate) {
+        try {
+            const date = new Date(formData.reportDate);
+            if (!isNaN(date.getTime())) {
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    year: 'numeric'
+                });
+                parts.push(`${formattedDate} Inspection`);
+            }
+        } catch (e) {
+            // Date parsing failed, skip date part
+        }
+    }
+    
+    // Join parts or return default
+    if (parts.length > 0) {
+        return parts.join(' - ');
+    }
+    
+    // Default with timestamp if nothing available
+    return `Inspection Report - ${new Date().toLocaleDateString()}`;
+};
     // Handle print
     const handlePrint = () => {
         // Create a new window for printing
@@ -601,20 +741,14 @@ export default function PVReport() {
                             
                             {/* Action Buttons */}
                             <div className="flex flex-wrap gap-2">
+                                {/* Update your existing Save button */}
                                 <button
-                                    onClick={handleSave}
+                                    onClick={() => handleSave('draft')}
                                     disabled={isSaving}
                                     className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 transition-all"
                                 >
                                     <Save className="h-4 w-4" />
-                                    {isSaving ? 'Saving...' : 'Save Draft'}
-                                </button>
-                                <button
-                                    onClick={() => handlePrint()}
-                                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:from-red-700 hover:to-red-800 transition-all"
-                                >
-                                    <Printer className="h-4 w-4" />
-                                    Print / PDF
+                                    {isSaving ? 'Saving...' : reportId ? 'Update Draft' : 'Save Draft'}
                                 </button>
                                 <button
                                     onClick={handleExportJSON}
@@ -936,38 +1070,118 @@ export default function PVReport() {
                             {/* Preview Section */}
                             {activeSection === "preview" && (
                                 <div>
-                                    <PreviewSection form={form} />
+                                    <PreviewSection form={form} handlePrint={handlePrint} />
+                                    
+                                    {/* Add submit button in preview */}
+                                    <div className="mt-6 flex justify-end gap-4">
+                                        <button
+                                            onClick={() => handleSave('draft')}
+                                            disabled={isSaving}
+                                            className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
+                                        >
+                                            {isSaving ? 'Saving...' : 'Save as Draft'}
+                                        </button>
+                                        <button
+                                            onClick={handleSubmit}
+                                            disabled={isSubmitting}
+                                            className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors"
+                                        >
+                                            {isSubmitting ? 'Submitting...' : 'Finalize & Submit'}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
                             {/* Navigation Footer */}
                             <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                                    <div className={`h-2 w-2 rounded-full ${new Date().getSeconds() % 2 === 0 ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                                     Auto-saved {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => {
-                                            const currentIndex = sections.findIndex(s => s.id === activeSection);
-                                            if (currentIndex > 0) {
-                                                setActiveSection(sections[currentIndex - 1].id);
-                                            }
-                                        }}
-                                        className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                                    >
-                                        Previous
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            const currentIndex = sections.findIndex(s => s.id === activeSection);
-                                            if (currentIndex < sections.length - 1) {
-                                                setActiveSection(sections[currentIndex + 1].id);
-                                            }
-                                        }}
-                                        className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                    >
-                                        Next Section
-                                    </button>
+                                <div className="flex items-center gap-3">
+                                    {/* Progress indicator */}
+                                    <div className="hidden sm:block text-xs text-gray-500 dark:text-gray-400">
+                                        {sections.findIndex(s => s.id === activeSection) + 1} of {sections.length}
+                                    </div>
+                                    
+                                    <div className="flex gap-2">
+                                        {/* Previous button - only show if not on first section */}
+                                        {sections.findIndex(s => s.id === activeSection) > 0 && (
+                                            <button
+                                                onClick={() => {
+                                                    const currentIndex = sections.findIndex(s => s.id === activeSection);
+                                                    setActiveSection(sections[currentIndex - 1].id);
+                                                }}
+                                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center gap-2 border border-gray-300 rounded-lg hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
+                                            >
+                                                <ChevronRight className="h-4 w-4 rotate-180" />
+                                                Previous
+                                            </button>
+                                        )}
+                                        
+                                        {/* Next/Complete button */}
+                                        {sections.findIndex(s => s.id === activeSection) === sections.length - 1 ? (
+                                            // Last section (Preview) - Show completion options
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        handleSave();
+                                                        toast.success('Report saved as draft!', {
+                                                            icon: '💾',
+                                                            duration: 3000,
+                                                        });
+                                                    }}
+                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors flex items-center gap-2"
+                                                >
+                                                    <Save className="h-4 w-4" />
+                                                    Save Draft
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        handleSave();
+                                                        toast.success('Report finalized! Ready for submission.', {
+                                                            icon: '✅',
+                                                            duration: 3000,
+                                                        });
+                                                    }}
+                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-800 transition-colors flex items-center gap-2"
+                                                >
+                                                    <Check className="h-4 w-4" />
+                                                    Finalize Report
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            // Not last section - Show next section button
+                                            <button
+                                                onClick={() => {
+                                                    const currentIndex = sections.findIndex(s => s.id === activeSection);
+                                                    const nextSection = sections[currentIndex + 1];
+                                                    
+                                                    // Optional: Validate current section before proceeding
+                                                    if (activeSection === 'details') {
+                                                        if (!form.equipmentTag || !form.equipmentType || !form.reportNo) {
+                                                            toast.error('Please complete all required fields in Equipment Details', {
+                                                                icon: '⚠️',
+                                                                duration: 3000,
+                                                            });
+                                                            return;
+                                                        }
+                                                    }
+                                                    
+                                                    setActiveSection(nextSection.id);
+                                                    
+                                                    // Optional: Auto-save
+                                                    setTimeout(() => {
+                                                        localStorage.setItem("ipetro_pv_report", JSON.stringify(form));
+                                                    }, 300);
+                                                }}
+                                                className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-colors flex items-center gap-2"
+                                            >
+                                                Continue to {sections[sections.findIndex(s => s.id === activeSection) + 1]?.label}
+                                                <ChevronRight className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1063,9 +1277,10 @@ function TextAreaSection({
 // Preview Section Component
 interface PreviewSectionProps {
     form: FormState;
+    handlePrint: () => void; // Add this line
 }
 
-function PreviewSection({ form }: PreviewSectionProps) {
+function PreviewSection({ form, handlePrint }: PreviewSectionProps) {
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
@@ -1086,287 +1301,288 @@ function PreviewSection({ form }: PreviewSectionProps) {
                             This is how your report will look when printed
                         </p>
                     </div>
+                    {/* Change this button to use handlePrint instead of window.print() */}
                     <button
-                        onClick={() => window.print()}
+                        onClick={handlePrint} // Use the passed function
                         className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:from-red-700 hover:to-red-800 transition-all"
                     >
                         <Printer className="h-4 w-4" />
-                        Print Document
+                        Print / PDF
                     </button>
                 </div>
             </div>
 
-{/* Document Paper Preview */}
-<div className="bg-white shadow-lg rounded-none print:shadow-none border border-gray-300 text-black [&_*]:text-black" 
-     style={{
-         maxWidth: '210mm',
-         minHeight: '297mm',
-         margin: '0 auto',
-         padding: '25mm',
-         boxSizing: 'border-box',
-         position: 'relative',
-         backgroundColor: 'white',
-         fontFamily: "'Times New Roman', Times, serif"
-     }}>
-    
-    {/* Watermark (Only in preview) */}
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none no-print">
-        <div className="text-gray-300 text-6xl font-bold opacity-10 transform -rotate-45">
-            DRAFT
-        </div>
-    </div>
-
-    {/* Report Header */}
-    <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '2px solid #000' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-                <div style={{ marginBottom: '10px' }}>
-                    <div style={{ height: '100px', width: '100px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '5px', overflow: 'hidden' }}>
-                        <img 
-                            src={ipetroLogo} 
-                            alt="iPETRO Logo"
-                            style={{ height: '90px', width: '90px', objectFit: 'contain' }}
-                            onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                e.currentTarget.parentElement.innerHTML = `
-                                    <span style="color: white; font-weight: bold; font-size: 32px;">iPETRO</span>
-                                `;
-                            }}
-                        />
-                    </div>
-                    <p style={{ fontSize: '9pt', fontWeight: 'bold', margin: '0', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                        Asset Integrity Management Department
-                    </p>
-                </div>
-                <h1 style={{ fontSize: '20pt', fontWeight: 'bold', margin: '10px 0 5px 0' }}>
-                    PRESSURE VESSEL INSPECTION REPORT
-                </h1>
-                <p style={{ fontSize: '14pt', fontWeight: 'bold', margin: '0' }}>
-                    Major Turnaround 2025
-                </p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '10pt' }}>
-                    <div style={{ marginBottom: '5px' }}>
-                        <span style={{ fontWeight: 'bold' }}>Report No:</span>
-                        <span style={{ marginLeft: '10px' }}>{form.reportNo || "________________"}</span>
-                    </div>
-                    <div style={{ marginBottom: '5px' }}>
-                        <span style={{ fontWeight: 'bold' }}>Date:</span>
-                        <span style={{ marginLeft: '10px' }}>{formatDate(form.reportDate)}</span>
-                    </div>
-                    <div>
-                        <span style={{ fontWeight: 'bold' }}>Revision:</span>
-                        <span style={{ marginLeft: '10px' }}>1.0</span>
+            {/* Document Paper Preview */}
+            <div className="bg-white shadow-lg rounded-none print:shadow-none border border-gray-300 text-black [&_*]:text-black" 
+                style={{
+                    maxWidth: '210mm',
+                    minHeight: '297mm',
+                    margin: '0 auto',
+                    padding: '25mm',
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    backgroundColor: 'white',
+                    fontFamily: "'Times New Roman', Times, serif"
+                }}>
+                
+                {/* Watermark (Only in preview) */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none no-print">
+                    <div className="text-gray-300 text-6xl font-bold opacity-10 transform -rotate-45">
+                        DRAFT
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    {/* Equipment Details Table */}
-    <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
-        1. EQUIPMENT IDENTIFICATION
-    </h2>
-    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
-        <tbody>
-            <tr>
-                <th style={{ width: '20%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    Equipment Tag No.
-                </th>
-                <td style={{ width: '30%', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.equipmentTag || "________________"}
-                </td>
-                <th style={{ width: '20%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    Plant / Unit / Area
-                </th>
-                <td style={{ width: '30%', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.plantUnitArea || "________________"}
-                </td>
-            </tr>
-            <tr>
-                <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    Equipment Description
-                </th>
-                <td style={{ border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.equipmentDescription || "________________"}
-                </td>
-                <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    DOSH Registration No.
-                </th>
-                <td style={{ border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.doshRegistration || "________________"}
-                </td>
-            </tr>
-        </tbody>
-    </table>
-
-    {/* Inspection Findings Table */}
-    <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
-        2. INSPECTION FINDINGS
-    </h2>
-    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
-        <tbody>
-            <tr>
-                <th style={{ width: '25%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    FINDINGS
-                </th>
-                <td colSpan={3} style={{ fontSize: '9pt', lineHeight: '1.3', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    <strong>Condition:</strong> With respect to the internal surface, describe and state location of any scales,
-                    oils or other deposits. Give location and extent of any corrosion and state whether
-                    it is active or inactive. State location and extent of any erosion, grooving,
-                    bulging, warping, cracking or similar condition. Report condition of tubes, coils,
-                    linings, baffles, supports and any major changes or repairs made since last inspection.
-                </td>
-            </tr>
-            <tr>
-                <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    Initial / Pre-Inspection
-                </th>
-                <td colSpan={3} style={{ minHeight: '40px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.initialFinding || "No initial observations recorded"}
-                </td>
-            </tr>
-            <tr>
-                <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    Post / Final Inspection – External
-                </th>
-                <td colSpan={3} style={{ minHeight: '60px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.externalFinding || "No external findings recorded"}
-                </td>
-            </tr>
-            <tr>
-                <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    Post / Final Inspection – Internal
-                </th>
-                <td colSpan={3} style={{ minHeight: '60px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.internalFinding || "No internal findings recorded"}
-                </td>
-            </tr>
-        </tbody>
-    </table>
-
-    {/* NDT Results */}
-    <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
-        3. NON-DESTRUCTIVE TESTINGS
-    </h2>
-    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
-        <tbody>
-            <tr>
-                <th style={{ width: '25%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    NDT Methods & Results
-                </th>
-                <td style={{ minHeight: '40px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.ndt || "No NDT results recorded"}
-                </td>
-            </tr>
-        </tbody>
-    </table>
-
-    {/* Recommendations */}
-    <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
-        4. RECOMMENDATIONS
-    </h2>
-    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
-        <tbody>
-            <tr>
-                <th style={{ width: '25%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                    Recommended Actions
-                </th>
-                <td style={{ minHeight: '40px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
-                    {form.recommendations || "No recommendations provided"}
-                </td>
-            </tr>
-        </tbody>
-    </table>
-
-    {/* Signatures & Approvals */}
-    <div style={{ marginTop: '30px' }}>
-        <h3 style={{ fontSize: '12pt', fontWeight: 'bold', margin: '0 0 20px 0', paddingBottom: '5px', borderBottom: '1px solid #000' }}>
-            APPROVAL & VERIFICATION
-        </h3>
-        
-        {/* DOSH Officer Section */}
-        <div style={{ marginBottom: '30px' }}>
-            <h4 style={{ fontSize: '11pt', fontWeight: 'bold', margin: '0 0 15px 0', color: '#333' }}>
-                Recommendation / Comment by DOSH Officer (if applicable):
-            </h4>
-            
-            {/* Comments Box */}
-            <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', backgroundColor: '#f9f9f9', borderRadius: '4px', minHeight: '80px' }}>
-                <p style={{ fontSize: '10pt', margin: '0', color: '#666', fontStyle: 'italic' }}>
-                    Enter DOSH officer comments or recommendations here...
-                </p>
-            </div>
-            
-            {/* DOSH Officer Signature */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
-                <div>
-                    <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Name</p>
-                    <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                    <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>DOSH Officer Name</p>
+                {/* Report Header */}
+                <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '2px solid #000' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                            <div style={{ marginBottom: '10px' }}>
+                                <div style={{ height: '100px', width: '100px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '5px', overflow: 'hidden' }}>
+                                    <img 
+                                        src={ipetroLogo} 
+                                        alt="iPETRO Logo"
+                                        style={{ height: '90px', width: '90px', objectFit: 'contain' }}
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            e.currentTarget.parentElement.innerHTML = `
+                                                <span style="color: white; font-weight: bold; font-size: 32px;">iPETRO</span>
+                                            `;
+                                        }}
+                                    />
+                                </div>
+                                <p style={{ fontSize: '9pt', fontWeight: 'bold', margin: '0', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                    Asset Integrity Management Department
+                                </p>
+                            </div>
+                            <h1 style={{ fontSize: '20pt', fontWeight: 'bold', margin: '10px 0 5px 0' }}>
+                                PRESSURE VESSEL INSPECTION REPORT
+                            </h1>
+                            <p style={{ fontSize: '14pt', fontWeight: 'bold', margin: '0' }}>
+                                Major Turnaround 2025
+                            </p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '10pt' }}>
+                                <div style={{ marginBottom: '5px' }}>
+                                    <span style={{ fontWeight: 'bold' }}>Report No:</span>
+                                    <span style={{ marginLeft: '10px' }}>{form.reportNo || "________________"}</span>
+                                </div>
+                                <div style={{ marginBottom: '5px' }}>
+                                    <span style={{ fontWeight: 'bold' }}>Date:</span>
+                                    <span style={{ marginLeft: '10px' }}>{formatDate(form.reportDate)}</span>
+                                </div>
+                                <div>
+                                    <span style={{ fontWeight: 'bold' }}>Revision:</span>
+                                    <span style={{ marginLeft: '10px' }}>1.0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Signature</p>
-                    <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                    <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Officer Signature</p>
-                </div>
-                <div>
-                    <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Date</p>
-                    <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                    <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>dd/mm/yyyy</p>
-                </div>
-            </div>
-        </div>
 
-        {/* Plant Action Section */}
-        <div style={{ marginBottom: '20px', paddingTop: '20px', borderTop: '1px dashed #ccc' }}>
-            <h4 style={{ fontSize: '11pt', fontWeight: 'bold', margin: '0 0 15px 0', color: '#333' }}>
-                Action taken by Plant on recommendation (if applicable):
-            </h4>
-            
-            {/* Action Taken Box */}
-            <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', backgroundColor: '#f9f9f9', borderRadius: '4px', minHeight: '80px' }}>
-                <p style={{ fontSize: '10pt', margin: '0', color: '#666', fontStyle: 'italic' }}>
-                    Describe actions taken by plant management...
-                </p>
-            </div>
-            
-            {/* Plant Management Signature */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
-                <div>
-                    <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Name</p>
-                    <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                    <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Plant Manager Name</p>
-                </div>
-                <div>
-                    <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Signature</p>
-                    <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                    <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Manager Signature</p>
-                </div>
-                <div>
-                    <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Date</p>
-                    <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                    <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>dd/mm/yyyy</p>
-                </div>
-            </div>
-        </div>
-    </div>
+                {/* Equipment Details Table */}
+                <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
+                    1. EQUIPMENT IDENTIFICATION
+                </h2>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
+                    <tbody>
+                        <tr>
+                            <th style={{ width: '20%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                Equipment Tag No.
+                            </th>
+                            <td style={{ width: '30%', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.equipmentTag || "________________"}
+                            </td>
+                            <th style={{ width: '20%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                Plant / Unit / Area
+                            </th>
+                            <td style={{ width: '30%', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.plantUnitArea || "________________"}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                Equipment Description
+                            </th>
+                            <td style={{ border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.equipmentDescription || "________________"}
+                            </td>
+                            <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                DOSH Registration No.
+                            </th>
+                            <td style={{ border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.doshRegistration || "________________"}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
 
-    {/* Footer */}
-    <div style={{ marginTop: '30px', paddingTop: '10px', borderTop: '1px solid #000', fontSize: '8pt' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div>
-                <p style={{ fontWeight: 'bold', margin: '0' }}>iPETRO Asset Integrity Management</p>
-                <p style={{ margin: '2px 0 0 0' }}>Document No: PV-IR-2025-001</p>
+                {/* Inspection Findings Table */}
+                <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
+                    2. INSPECTION FINDINGS
+                </h2>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
+                    <tbody>
+                        <tr>
+                            <th style={{ width: '25%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                FINDINGS
+                            </th>
+                            <td colSpan={3} style={{ fontSize: '9pt', lineHeight: '1.3', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                <strong>Condition:</strong> With respect to the internal surface, describe and state location of any scales,
+                                oils or other deposits. Give location and extent of any corrosion and state whether
+                                it is active or inactive. State location and extent of any erosion, grooving,
+                                bulging, warping, cracking or similar condition. Report condition of tubes, coils,
+                                linings, baffles, supports and any major changes or repairs made since last inspection.
+                            </td>
+                        </tr>
+                        <tr>
+                            <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                Initial / Pre-Inspection
+                            </th>
+                            <td colSpan={3} style={{ minHeight: '40px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.initialFinding || "No initial observations recorded"}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                Post / Final Inspection – External
+                            </th>
+                            <td colSpan={3} style={{ minHeight: '60px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.externalFinding || "No external findings recorded"}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th style={{ textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                Post / Final Inspection – Internal
+                            </th>
+                            <td colSpan={3} style={{ minHeight: '60px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.internalFinding || "No internal findings recorded"}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* NDT Results */}
+                <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
+                    3. NON-DESTRUCTIVE TESTINGS
+                </h2>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
+                    <tbody>
+                        <tr>
+                            <th style={{ width: '25%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                NDT Methods & Results
+                            </th>
+                            <td style={{ minHeight: '40px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.ndt || "No NDT results recorded"}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Recommendations */}
+                <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
+                    4. RECOMMENDATIONS
+                </h2>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
+                    <tbody>
+                        <tr>
+                            <th style={{ width: '25%', textAlign: 'center', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                                Recommended Actions
+                            </th>
+                            <td style={{ minHeight: '40px', whiteSpace: 'pre-wrap', border: '1px solid #000', padding: '6px 8px', verticalAlign: 'top' }}>
+                                {form.recommendations || "No recommendations provided"}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Signatures & Approvals */}
+                <div style={{ marginTop: '30px' }}>
+                    <h3 style={{ fontSize: '12pt', fontWeight: 'bold', margin: '0 0 20px 0', paddingBottom: '5px', borderBottom: '1px solid #000' }}>
+                        APPROVAL & VERIFICATION
+                    </h3>
+                    
+                    {/* DOSH Officer Section */}
+                    <div style={{ marginBottom: '30px' }}>
+                        <h4 style={{ fontSize: '11pt', fontWeight: 'bold', margin: '0 0 15px 0', color: '#333' }}>
+                            Recommendation / Comment by DOSH Officer (if applicable):
+                        </h4>
+                        
+                        {/* Comments Box */}
+                        <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', backgroundColor: '#f9f9f9', borderRadius: '4px', minHeight: '80px' }}>
+                            <p style={{ fontSize: '10pt', margin: '0', color: '#666', fontStyle: 'italic' }}>
+                                Enter DOSH officer comments or recommendations here...
+                            </p>
+                        </div>
+                        
+                        {/* DOSH Officer Signature */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
+                            <div>
+                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Name</p>
+                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
+                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>DOSH Officer Name</p>
+                            </div>
+                            <div>
+                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Signature</p>
+                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
+                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Officer Signature</p>
+                            </div>
+                            <div>
+                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Date</p>
+                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
+                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>dd/mm/yyyy</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Plant Action Section */}
+                    <div style={{ marginBottom: '20px', paddingTop: '20px', borderTop: '1px dashed #ccc' }}>
+                        <h4 style={{ fontSize: '11pt', fontWeight: 'bold', margin: '0 0 15px 0', color: '#333' }}>
+                            Action taken by Plant on recommendation (if applicable):
+                        </h4>
+                        
+                        {/* Action Taken Box */}
+                        <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', backgroundColor: '#f9f9f9', borderRadius: '4px', minHeight: '80px' }}>
+                            <p style={{ fontSize: '10pt', margin: '0', color: '#666', fontStyle: 'italic' }}>
+                                Describe actions taken by plant management...
+                            </p>
+                        </div>
+                        
+                        {/* Plant Management Signature */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
+                            <div>
+                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Name</p>
+                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
+                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Plant Manager Name</p>
+                            </div>
+                            <div>
+                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Signature</p>
+                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
+                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Manager Signature</p>
+                            </div>
+                            <div>
+                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Date</p>
+                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
+                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>dd/mm/yyyy</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{ marginTop: '30px', paddingTop: '10px', borderTop: '1px solid #000', fontSize: '8pt' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div>
+                            <p style={{ fontWeight: 'bold', margin: '0' }}>iPETRO Asset Integrity Management</p>
+                            <p style={{ margin: '2px 0 0 0' }}>Document No: PV-IR-2025-001</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <p style={{ margin: '0' }}>Page 1 of 1</p>
+                            <p style={{ margin: '2px 0 0 0' }}>Confidential - For Internal Use Only</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-                <p style={{ margin: '0' }}>Page 1 of 1</p>
-                <p style={{ margin: '2px 0 0 0' }}>Confidential - For Internal Use Only</p>
-            </div>
-        </div>
-    </div>
-</div>
         </div>
     );
 }

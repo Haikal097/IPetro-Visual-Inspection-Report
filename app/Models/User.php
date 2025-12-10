@@ -49,4 +49,23 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
+        public function hasRole($role)
+    {
+        return $this->role === $role;
+    }
+    
+    public function hasAnyRole(array $roles)
+    {
+        return in_array($this->role, $roles);
+    }
+    
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
+    
+    public function isReviewer()
+    {
+        return $this->role === 'reviewer';
+    }
 }

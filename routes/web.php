@@ -27,13 +27,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
     Route::get('/report', function () {
-        return inertia('Reports/Index');
+        return inertia('Reports/IndexInspector');
     });
     Route::get('/pv-report', function () {
-    return Inertia::render('Reports/PVReport');
+        return Inertia::render('Reports/PVReport');
+    });
+
 });
 
-
+Route::prefix('api')->middleware('auth:sanctum')->group(function () {
+    Route::apiResource('reports', ReportController::class);
+    Route::post('/reports/{id}/submit', [ReportController::class, 'submit']);
+    Route::post('/reports/{id}/approve', [ReportController::class, 'approve']);
 });
 
 
