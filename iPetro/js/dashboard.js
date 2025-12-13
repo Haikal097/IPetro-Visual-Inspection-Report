@@ -3,10 +3,23 @@
 // Initialize Chart on page load
 let activityChart;
 let currentFilter = 'week';
+let currentSortColumn = -1;
+let currentSortDirection = 'asc';
+let rowsPerPage = 10;
+let allTableRows = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeChart();
+    initializeTable();
 });
+
+// Initialize table and store all rows
+function initializeTable() {
+    const table = document.getElementById('reportTable');
+    const tbody = table.getElementsByTagName('tbody')[0];
+    allTableRows = Array.from(tbody.getElementsByTagName('tr'));
+    updatePaginationDisplay();
+}
 
 // Chart Initialization
 function initializeChart() {
@@ -128,12 +141,12 @@ function filterChart(period) {
 function searchTable() {
     const input = document.getElementById('searchInput');
     const filter = input.value.toUpperCase();
-    const table = document.getElementById('reportTable');
-    const tr = table.getElementsByTagName('tr');
     
-    // Loop through all table rows (except header)
-    for (let i = 1; i < tr.length; i++) {
-        const row = tr[i];
+    // Reset to first page when searching
+    currentPage = 1;
+    
+    // Loop through all table rows
+    allTableRows.forEach(row => {
         const cells = row.getElementsByTagName('td');
         let found = false;
         
@@ -149,38 +162,46 @@ function searchTable() {
             }
         }
         
-        // Show or hide row based on search result
-        if (found) {
-            row.style.display = '';
+        // Mark row as filtered or not
+        if (found || filter === '') {
+            row.removeAttribute('data-filtered');
         } else {
+            row.setAttribute('data-filtered', 'true');
             row.style.display = 'none';
         }
-    }
+    });
+    
+    updatePaginationDisplay();
+    updatePagination();
 }
 
 // Filter by Status
 function filterByStatus() {
     const statusFilter = document.getElementById('statusFilter').value;
-    const table = document.getElementById('reportTable');
-    const tr = table.getElementsByTagName('tr');
     
-    // Loop through all table rows (except header)
-    for (let i = 1; i < tr.length; i++) {
-        const row = tr[i];
+    // Reset to first page when filtering
+    currentPage = 1;
+    
+    // Loop through all table rows
+    allTableRows.forEach(row => {
         const statusCell = row.getElementsByClassName('status-badge')[0];
         
         if (statusCell) {
             const statusText = statusCell.textContent.trim().toLowerCase().replace(' ', '-');
             
             if (statusFilter === 'all') {
-                row.style.display = '';
+                row.removeAttribute('data-filtered');
             } else if (statusText.includes(statusFilter.replace('_', '-'))) {
-                row.style.display = '';
+                row.removeAttribute('data-filtered');
             } else {
+                row.setAttribute('data-filtered', 'true');
                 row.style.display = 'none';
             }
         }
-    }
+    });
+    
+    updatePaginationDisplay();
+    updatePagination();
 }
 
 // View Report Function
@@ -211,22 +232,61 @@ function downloadReport(reportId) {
 let currentPage = 1;
 
 function changePage(direction) {
-    const totalPages = 5; // Example total pages
+    const visibleRows = getVisibleRows();
+    const totalPages = Math.ceil(visibleRows.length / rowsPerPage);
     
     if (direction === 'prev' && currentPage > 1) {
         currentPage--;
-        updatePagination();
     } else if (direction === 'next' && currentPage < totalPages) {
         currentPage++;
-        updatePagination();
     }
     
-    // TODO: Load data for the new page
-    console.log('Current page:', currentPage);
-    // loadPageData(currentPage);
+    updatePaginationDisplay();
+    updatePagination();
+}
+
+function updatePaginationDisplay() {
+    const visibleRows = getVisibleRows();
+    const table = document.getElementById('reportTable');
+    const tbody = table.getElementsByTagName('tbody')[0];
+    
+    // Calculate start and end indices
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    
+    // Hide all rows first
+    allTableRows.forEach(row => row.style.display = 'none');
+    
+    // Show only rows for current page
+    visibleRows.slice(startIndex, endIndex).forEach(row => {
+        row.style.display = '';
+    });
+}
+
+function getVisibleRows() {
+    // Get rows that are not filtered out
+    return allTableRows.filter(row => row.style.display !== 'none' || !row.hasAttribute('data-filtered'));
+}
+
+function updateRowsPerPage() {
+    const input = document.getElementById('rowsPerPage');
+    const value = parseInt(input.value);
+    
+    if (value >= 5 && value <= 50) {
+        rowsPerPage = value;
+        currentPage = 1; // Reset to first page
+        updatePaginationDisplay();
+        updatePagination();
+    } else {
+        alert('Please enter a number between 5 and 50');
+        input.value = rowsPerPage;
+    }
 }
 
 function updatePagination() {
+    const visibleRows = getVisibleRows();
+    const totalPages = Math.ceil(visibleRows.length / rowsPerPage);
+    
     const pageButtons = document.querySelectorAll('.page-btn:not(:first-child):not(:last-child)');
     pageButtons.forEach((btn, index) => {
         if (index + 1 === currentPage) {
@@ -234,7 +294,97 @@ function updatePagination() {
         } else {
             btn.classList.remove('active');
         }
+        
+        // Hide buttons if page doesn't exist
+        if (index + 1 > totalPages) {
+            btn.style.display = 'none';
+        } else {
+            btn.style.display = '';
+        }
     });
+}
+
+// ============================================================================
+// TABLE SORTING FUNCTIONALITY
+// ============================================================================
+
+function sortTable(columnIndex) {
+    const table = document.getElementById('reportTable');
+    const tbody = table.getElementsByTagName('tbody')[0];
+    const headers = table.querySelectorAll('th.sortable');
+    
+    // Determine sort direction
+    if (currentSortColumn === columnIndex) {
+        // Toggle direction if clicking same column
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        // Reset to ascending for new column
+        currentSortDirection = 'asc';
+        currentSortColumn = columnIndex;
+    }
+    
+    // Update header styles
+    headers.forEach((header, index) => {
+        header.classList.remove('asc', 'desc');
+        if (index === columnIndex) {
+            header.classList.add(currentSortDirection);
+        }
+    });
+    
+    // Get all visible rows
+    const visibleRows = Array.from(allTableRows).filter(row => {
+        return row.style.display !== 'none';
+    });
+    
+    // Sort the rows
+    visibleRows.sort((rowA, rowB) => {
+        let cellA = rowA.getElementsByTagName('td')[columnIndex];
+        let cellB = rowB.getElementsByTagName('td')[columnIndex];
+        
+        let valueA = getCellValue(cellA);
+        let valueB = getCellValue(cellB);
+        
+        // Handle different data types
+        if (columnIndex === 4) { // Date column
+            valueA = new Date(valueA);
+            valueB = new Date(valueB);
+        } else if (!isNaN(valueA) && !isNaN(valueB)) {
+            valueA = parseFloat(valueA);
+            valueB = parseFloat(valueB);
+        } else {
+            valueA = valueA.toLowerCase();
+            valueB = valueB.toLowerCase();
+        }
+        
+        if (valueA < valueB) {
+            return currentSortDirection === 'asc' ? -1 : 1;
+        }
+        if (valueA > valueB) {
+            return currentSortDirection === 'asc' ? 1 : -1;
+        }
+        return 0;
+    });
+    
+    // Reorder the rows in the table
+    visibleRows.forEach(row => tbody.appendChild(row));
+    
+    // Update pagination after sorting
+    currentPage = 1;
+    updatePaginationDisplay();
+}
+
+function getCellValue(cell) {
+    // Get text content, handling nested elements
+    if (cell.querySelector('.equipment-info strong')) {
+        return cell.querySelector('.equipment-info strong').textContent.trim();
+    }
+    if (cell.querySelector('.status-badge')) {
+        return cell.querySelector('.status-badge').textContent.trim();
+    }
+    if (cell.querySelector('strong')) {
+        return cell.querySelector('strong').textContent.trim();
+    }
+    return cell.textContent.trim();
 }
 
 // ============================================================================
