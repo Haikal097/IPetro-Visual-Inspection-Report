@@ -1,164 +1,17 @@
-// Create Report Form JavaScript
+// Photo-First Inspection Report System
 
-let currentStep = 1;
-let defectCount = 1;
 let uploadedPhotos = [];
+let currentPhotoIndex = 0;
+let photoData = []; // Stores details for each photo
 
-// Initialize on page load
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // Set today's date as default
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('inspection_date').value = today;
-    
-    // Setup drag and drop
     setupDragAndDrop();
-    
-    // Update summary on any input change
-    document.getElementById('reportForm').addEventListener('input', updateSummary);
+    updateProgressIndicator();
 });
 
 // ============================================================================
-// STEP NAVIGATION
-// ============================================================================
-
-function nextStep() {
-    // Validate current step
-    if (!validateStep(currentStep)) {
-        return;
-    }
-    
-    // Mark current step as completed
-    const currentStepEl = document.querySelector(`.step[data-step="${currentStep}"]`);
-    currentStepEl.classList.add('completed');
-    
-    // Hide current section
-    const currentSection = document.querySelector(`.form-section[data-section="${currentStep}"]`);
-    currentSection.classList.remove('active');
-    
-    // Move to next step
-    currentStep++;
-    
-    // Show next section
-    const nextSection = document.querySelector(`.form-section[data-section="${currentStep}"]`);
-    nextSection.classList.add('active');
-    
-    // Update step indicator
-    const nextStepEl = document.querySelector(`.step[data-step="${currentStep}"]`);
-    nextStepEl.classList.add('active');
-    
-    // Remove active from previous steps
-    document.querySelectorAll('.step').forEach(step => {
-        const stepNum = parseInt(step.getAttribute('data-step'));
-        if (stepNum < currentStep) {
-            step.classList.remove('active');
-        }
-    });
-    
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    // Update summary if on final step
-    if (currentStep === 4) {
-        updateSummary();
-    }
-}
-
-function prevStep() {
-    // Hide current section
-    const currentSection = document.querySelector(`.form-section[data-section="${currentStep}"]`);
-    currentSection.classList.remove('active');
-    
-    // Remove active from current step
-    const currentStepEl = document.querySelector(`.step[data-step="${currentStep}"]`);
-    currentStepEl.classList.remove('active');
-    
-    // Move to previous step
-    currentStep--;
-    
-    // Show previous section
-    const prevSection = document.querySelector(`.form-section[data-section="${currentStep}"]`);
-    prevSection.classList.add('active');
-    
-    // Update step indicator
-    const prevStepEl = document.querySelector(`.step[data-step="${currentStep}"]`);
-    prevStepEl.classList.add('active');
-    
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// ============================================================================
-// VALIDATION
-// ============================================================================
-
-function validateStep(step) {
-    let isValid = true;
-    const section = document.querySelector(`.form-section[data-section="${step}"]`);
-    
-    // Get all required fields in current step
-    const requiredFields = section.querySelectorAll('[required]');
-    
-    requiredFields.forEach(field => {
-        if (!field.value.trim()) {
-            isValid = false;
-            field.style.borderColor = '#c33';
-            
-            // Show error message
-            if (!field.nextElementSibling || !field.nextElementSibling.classList.contains('error-message')) {
-                const errorMsg = document.createElement('small');
-                errorMsg.className = 'error-message';
-                errorMsg.style.color = '#c33';
-                errorMsg.textContent = 'This field is required';
-                field.parentNode.insertBefore(errorMsg, field.nextSibling);
-            }
-        } else {
-            field.style.borderColor = '';
-            // Remove error message if exists
-            const errorMsg = field.nextElementSibling;
-            if (errorMsg && errorMsg.classList.contains('error-message')) {
-                errorMsg.remove();
-            }
-        }
-    });
-    
-    if (!isValid) {
-        alert('Please fill in all required fields before proceeding.');
-    }
-    
-    return isValid;
-}
-
-// ============================================================================
-// EQUIPMENT DETAILS
-// ============================================================================
-
-function loadEquipmentDetails() {
-    const equipmentId = document.getElementById('equipment_id').value;
-    
-    // Sample equipment data (replace with database query)
-    const equipmentData = {
-        '1': { tag: 'V-101', pmt: 'PMT-12345', name: 'Pressure Vessel V-101' },
-        '2': { tag: 'HE-205', pmt: 'PMT-12346', name: 'Heat Exchanger HE-205' },
-        '3': { tag: 'R-301', pmt: 'PMT-12347', name: 'Reactor R-301' },
-        '4': { tag: 'S-110', pmt: 'PMT-12348', name: 'Separator S-110' },
-        '5': { tag: 'A-402', pmt: 'PMT-12349', name: 'Accumulator A-402' },
-        '6': { tag: 'C-201', pmt: 'PMT-12350', name: 'Condenser C-201' }
-    };
-    
-    if (equipmentId && equipmentData[equipmentId]) {
-        const data = equipmentData[equipmentId];
-        document.getElementById('equipment_tag').value = data.tag;
-        document.getElementById('pmt_number').value = data.pmt;
-        document.getElementById('summaryEquipment').textContent = data.name;
-    } else {
-        document.getElementById('equipment_tag').value = '';
-        document.getElementById('pmt_number').value = '';
-        document.getElementById('summaryEquipment').textContent = '-';
-    }
-}
-
-// ============================================================================
-// PHOTO UPLOAD
+// STEP 1: PHOTO UPLOAD
 // ============================================================================
 
 function setupDragAndDrop() {
@@ -202,174 +55,390 @@ function handleFileSelect(e) {
 }
 
 function handleFiles(files) {
-    // Convert FileList to Array
     const filesArray = Array.from(files);
     
     filesArray.forEach(file => {
-        // Validate file
         if (!file.type.match('image.*')) {
             alert(`${file.name} is not an image file.`);
             return;
         }
         
-        if (file.size > 10 * 1024 * 1024) { // 10MB
+        if (file.size > 10 * 1024 * 1024) {
             alert(`${file.name} is too large. Maximum size is 10MB.`);
             return;
         }
         
-        // Add to uploaded photos array
         uploadedPhotos.push(file);
         
-        // Create preview
         const reader = new FileReader();
         reader.onload = function(e) {
-            addPhotoPreview(file, e.target.result);
+            addPhotoToGallery(file, e.target.result, uploadedPhotos.length - 1);
+            updatePhotoCount();
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function addPhotoToGallery(file, dataUrl, index) {
+    const gallery = document.getElementById('photoGallery');
+    
+    const photoCard = document.createElement('div');
+    photoCard.className = 'photo-card';
+    photoCard.dataset.index = index;
+    
+    photoCard.innerHTML = `
+        <img src="${dataUrl}" alt="${file.name}">
+        <div class="photo-card-info">
+            <p class="photo-card-name">${file.name}</p>
+            <p class="photo-card-size">${(file.size / 1024).toFixed(1)} KB</p>
+            <span class="photo-status" id="status-${index}">⏳ Pending</span>
+        </div>
+        <button type="button" class="photo-card-remove" onclick="removePhoto(${index})">×</button>
+    `;
+    
+    gallery.appendChild(photoCard);
+}
+
+function removePhoto(index) {
+    uploadedPhotos.splice(index, 1);
+    photoData.splice(index, 1);
+    
+    // Rebuild gallery
+    const gallery = document.getElementById('photoGallery');
+    gallery.innerHTML = '';
+    
+    uploadedPhotos.forEach((file, i) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            addPhotoToGallery(file, e.target.result, i);
+            if (photoData[i]) {
+                document.getElementById(`status-${i}`).textContent = '✓ Completed';
+                document.getElementById(`status-${i}`).style.color = '#27ae60';
+            }
         };
         reader.readAsDataURL(file);
     });
     
-    updateSummary();
+    updatePhotoCount();
 }
 
-function addPhotoPreview(file, dataUrl) {
-    const previewGrid = document.getElementById('photoPreview');
+function updatePhotoCount() {
+    const count = uploadedPhotos.length;
+    document.getElementById('photoCount').textContent = `${count} photo${count !== 1 ? 's' : ''} uploaded`;
+    document.getElementById('proceedBtn').textContent = `Next: Fill Photo Details (${count} photo${count !== 1 ? 's' : ''}) →`;
+    document.getElementById('proceedBtn').disabled = count === 0;
     
-    const photoItem = document.createElement('div');
-    photoItem.className = 'photo-preview-item';
-    photoItem.dataset.filename = file.name;
-    
-    photoItem.innerHTML = `
-        <img src="${dataUrl}" alt="${file.name}">
-        <button type="button" class="photo-remove" onclick="removePhoto('${file.name}')">×</button>
-        <div class="photo-info">
-            <div>${file.name}</div>
-            <div>${(file.size / 1024).toFixed(1)} KB</div>
-        </div>
-    `;
-    
-    previewGrid.appendChild(photoItem);
-}
-
-function removePhoto(filename) {
-    // Remove from array
-    uploadedPhotos = uploadedPhotos.filter(file => file.name !== filename);
-    
-    // Remove from DOM
-    const photoItem = document.querySelector(`.photo-preview-item[data-filename="${filename}"]`);
-    if (photoItem) {
-        photoItem.remove();
-    }
-    
-    updateSummary();
-}
-
-// ============================================================================
-// DEFECT MANAGEMENT
-// ============================================================================
-
-function addDefect() {
-    defectCount++;
-    const container = document.getElementById('defectsContainer');
-    
-    const defectEntry = document.createElement('div');
-    defectEntry.className = 'defect-entry';
-    defectEntry.dataset.defect = defectCount;
-    
-    defectEntry.innerHTML = `
-        <div class="defect-header">
-            <h4>Defect #${defectCount}</h4>
-            <button type="button" class="btn-remove" onclick="removeDefect(${defectCount})">✕ Remove</button>
-        </div>
-        <div class="form-grid">
-            <div class="form-group">
-                <label>Defect Type <span class="required">*</span></label>
-                <select name="defect_type[]" required>
-                    <option value="">-- Select Type --</option>
-                    <option value="crack">Crack</option>
-                    <option value="corrosion">Corrosion</option>
-                    <option value="weld_defect">Weld Defect</option>
-                    <option value="deformation">Deformation</option>
-                    <option value="leak">Leak</option>
-                    <option value="erosion">Erosion</option>
-                    <option value="other">Other</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Severity</label>
-                <select name="defect_severity[]">
-                    <option value="minor">Minor</option>
-                    <option value="moderate">Moderate</option>
-                    <option value="major">Major</option>
-                    <option value="critical">Critical</option>
-                </select>
-            </div>
-            <div class="form-group full-width">
-                <label>Defect Location</label>
-                <input type="text" name="defect_location[]" placeholder="e.g., Shell longitudinal weld, Section A-2">
-            </div>
-            <div class="form-group">
-                <label>Length (mm)</label>
-                <input type="number" name="defect_length[]" step="0.1" placeholder="0.0">
-            </div>
-            <div class="form-group">
-                <label>Width (mm)</label>
-                <input type="number" name="defect_width[]" step="0.1" placeholder="0.0">
-            </div>
-            <div class="form-group full-width">
-                <label>Description</label>
-                <textarea name="defect_description[]" rows="2" placeholder="Detailed description of the defect..."></textarea>
-            </div>
-        </div>
-    `;
-    
-    container.appendChild(defectEntry);
-    updateSummary();
-}
-
-function removeDefect(defectNum) {
-    const defectEntry = document.querySelector(`.defect-entry[data-defect="${defectNum}"]`);
-    if (defectEntry) {
-        defectEntry.remove();
-        updateSummary();
+    if (count > 0) {
+        document.getElementById('detailsProgress').classList.add('active');
     }
 }
 
-// ============================================================================
-// SUMMARY UPDATE
-// ============================================================================
-
-function updateSummary() {
-    // Update inspection date
-    const inspectionDate = document.getElementById('inspection_date').value;
-    document.getElementById('summaryDate').textContent = inspectionDate || '-';
+function proceedToDetails() {
+    if (uploadedPhotos.length === 0) {
+        alert('Please upload at least one photo first.');
+        return;
+    }
     
-    // Update equipment (already updated in loadEquipmentDetails)
+    // Initialize photoData array
+    if (photoData.length === 0) {
+        photoData = uploadedPhotos.map(() => ({}));
+    }
     
-    // Update photos count
-    document.getElementById('summaryPhotos').textContent = uploadedPhotos.length;
+    document.getElementById('uploadSection').classList.remove('active');
+    document.getElementById('detailsSection').classList.add('active');
     
-    // Update defects count
-    const defectsCount = document.querySelectorAll('.defect-entry').length;
-    document.getElementById('summaryDefects').textContent = defectsCount;
+    currentPhotoIndex = 0;
+    loadPhotoDetails(0);
+    updatePhotoNavigation();
+    updateProgressIndicator();
 }
 
 // ============================================================================
-// FORM SUBMISSION
+// STEP 2: FILL PHOTO DETAILS
 // ============================================================================
 
-document.getElementById('reportForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
+function loadPhotoDetails(index) {
+    const file = uploadedPhotos[index];
+    const reader = new FileReader();
     
-    // Validate all steps
-    for (let i = 1; i <= 4; i++) {
-        if (!validateStep(i)) {
-            alert(`Please complete step ${i} before submitting.`);
-            return;
+    reader.onload = function(e) {
+        document.getElementById('currentPhotoImg').src = e.target.result;
+        document.getElementById('currentPhotoName').textContent = file.name;
+    };
+    reader.readAsDataURL(file);
+    
+    // Load saved data if exists
+    if (photoData[index]) {
+        const data = photoData[index];
+        document.querySelectorAll('.photo-field').forEach(field => {
+            const fieldName = field.dataset.field;
+            if (data[fieldName]) {
+                if (field.type === 'checkbox') {
+                    field.checked = data[fieldName];
+                } else {
+                    field.value = data[fieldName];
+                }
+                
+                // Trigger change events for "other" fields
+                if (field.tagName === 'SELECT') {
+                    field.dispatchEvent(new Event('change'));
+                }
+            }
+        });
+        
+        // Handle defect toggle
+        if (data.defect_found === 'yes') {
+            document.getElementById('defectFields').style.display = 'block';
+        }
+    } else {
+        // Clear form for new photo
+        document.querySelectorAll('.photo-field').forEach(field => {
+            if (field.type === 'checkbox') {
+                field.checked = false;
+            } else {
+                field.value = '';
+            }
+        });
+        
+        // Set today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelector('[data-field="inspection_date"]').value = today;
+        document.querySelector('[data-field="defect_found"]').value = 'no';
+        document.getElementById('defectFields').style.display = 'none';
+    }
+}
+
+function saveCurrentPhoto() {
+    const data = {};
+    let isValid = true;
+    
+    // Collect all field values
+    document.querySelectorAll('.photo-field').forEach(field => {
+        const fieldName = field.dataset.field;
+        
+        if (field.type === 'checkbox') {
+            data[fieldName] = field.checked;
+        } else {
+            data[fieldName] = field.value;
+        }
+        
+        // Validate required fields
+        if (field.required && !field.value) {
+            isValid = false;
+            field.style.borderColor = '#c33';
+        } else {
+            field.style.borderColor = '';
+        }
+    });
+    
+    if (!isValid) {
+        alert('Please fill in all required fields.');
+        return false;
+    }
+    
+    // Handle "other" fields
+    if (data.equipment_type === 'other' && data.equipment_type_other) {
+        data.equipment_type = data.equipment_type_other;
+    }
+    if (data.equipment_tag === 'other' && data.equipment_tag_other) {
+        data.equipment_tag = data.equipment_tag_other;
+    }
+    if (data.pmt_number === 'other' && data.pmt_number_other) {
+        data.pmt_number = data.pmt_number_other;
+    }
+    if (data.equipment_location === 'other' && data.equipment_location_other) {
+        data.equipment_location = data.equipment_location_other;
+    }
+    if (data.defect_location === 'other' && data.defect_location_other) {
+        data.defect_location = data.defect_location_other;
+    }
+    if (data.general_findings === 'other' && data.general_findings_other) {
+        data.general_findings = data.general_findings_other;
+    }
+    if (data.recommendations === 'other' && data.recommendations_other) {
+        data.recommendations = data.recommendations_other;
+    }
+    
+    photoData[currentPhotoIndex] = data;
+    
+    // Update status in gallery
+    const statusEl = document.getElementById(`status-${currentPhotoIndex}`);
+    if (statusEl) {
+        statusEl.textContent = '✓ Completed';
+        statusEl.style.color = '#27ae60';
+    }
+    
+    updateProgressIndicator();
+    showToast('Photo details saved successfully!', 'success');
+    return true;
+}
+
+function saveAndNext() {
+    if (saveCurrentPhoto()) {
+        if (currentPhotoIndex < uploadedPhotos.length - 1) {
+            nextPhoto();
+        } else {
+            // All photos completed
+            proceedToReview();
         }
     }
+}
+
+function nextPhoto() {
+    if (currentPhotoIndex < uploadedPhotos.length - 1) {
+        currentPhotoIndex++;
+        loadPhotoDetails(currentPhotoIndex);
+        updatePhotoNavigation();
+    }
+}
+
+function previousPhoto() {
+    if (currentPhotoIndex > 0) {
+        currentPhotoIndex--;
+        loadPhotoDetails(currentPhotoIndex);
+        updatePhotoNavigation();
+    }
+}
+
+function updatePhotoNavigation() {
+    const total = uploadedPhotos.length;
+    document.getElementById('photoCounter').textContent = `Photo ${currentPhotoIndex + 1} of ${total}`;
     
-    // Show loading state
-    const submitBtn = document.getElementById('submitBtn');
+    document.getElementById('prevPhotoBtn').disabled = currentPhotoIndex === 0;
+    document.getElementById('nextPhotoBtn').disabled = currentPhotoIndex >= total - 1;
+    
+    // Update button text
+    if (currentPhotoIndex === total - 1) {
+        document.getElementById('saveNextBtn').textContent = 'Save & Review Report →';
+    } else {
+        document.getElementById('saveNextBtn').textContent = 'Save & Next Photo →';
+    }
+}
+
+// ============================================================================
+// HANDLE "OTHER" SELECTIONS
+// ============================================================================
+
+function handleEquipmentTypeChange(select) {
+    const otherGroup = document.getElementById('otherEquipmentGroup');
+    otherGroup.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function handleTagChange(select) {
+    const otherGroup = document.getElementById('otherTagGroup');
+    otherGroup.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function handlePMTChange(select) {
+    const otherGroup = document.getElementById('otherPMTGroup');
+    otherGroup.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function handleLocationChange(select) {
+    const otherGroup = document.getElementById('otherLocationGroup');
+    otherGroup.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function handleDefectLocationChange(select) {
+    const otherGroup = document.getElementById('otherDefectLocationGroup');
+    otherGroup.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function handleFindingsChange(select) {
+    const otherGroup = document.getElementById('otherFindingsGroup');
+    otherGroup.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function handleRecommendationsChange(select) {
+    const otherGroup = document.getElementById('otherRecommendationsGroup');
+    otherGroup.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function toggleDefectFields(select) {
+    const defectFields = document.getElementById('defectFields');
+    defectFields.style.display = select.value === 'yes' ? 'block' : 'none';
+}
+
+// ============================================================================
+// STEP 3: REVIEW & SUBMIT
+// ============================================================================
+
+function proceedToReview() {
+    // Check if all photos have details
+    const completedCount = photoData.filter(d => Object.keys(d).length > 0).length;
+    
+    if (completedCount < uploadedPhotos.length) {
+        const proceed = confirm(`Only ${completedCount} of ${uploadedPhotos.length} photos have details filled. Do you want to continue to review?`);
+        if (!proceed) return;
+    }
+    
+    document.getElementById('detailsSection').classList.remove('active');
+    document.getElementById('reviewSection').classList.add('active');
+    document.getElementById('submitProgress').classList.add('active');
+    
+    populateReview();
+    updateProgressIndicator();
+}
+
+function populateReview() {
+    const completedCount = photoData.filter(d => Object.keys(d).length > 0).length;
+    
+    document.getElementById('reviewPhotoCount').textContent = uploadedPhotos.length;
+    document.getElementById('reviewCompletedCount').textContent = completedCount;
+    document.getElementById('reviewDate').textContent = new Date().toLocaleDateString();
+    
+    const reviewGrid = document.getElementById('reviewGrid');
+    reviewGrid.innerHTML = '';
+    
+    uploadedPhotos.forEach((file, index) => {
+        const data = photoData[index] || {};
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const card = document.createElement('div');
+            card.className = 'review-photo-card';
+            
+            card.innerHTML = `
+                <div class="review-photo-header">
+                    <strong>Photo ${index + 1}</strong>
+                    <button type="button" class="btn-edit-small" onclick="editPhoto(${index})">✏️ Edit</button>
+                </div>
+                <img src="${e.target.result}" alt="Photo ${index + 1}">
+                <div class="review-photo-details">
+                    <p><strong>Equipment:</strong> ${data.equipment_type || 'N/A'} (${data.equipment_tag || 'N/A'})</p>
+                    <p><strong>Location:</strong> ${data.equipment_location || 'N/A'}</p>
+                    <p><strong>Inspection:</strong> ${data.inspection_type || 'N/A'}</p>
+                    <p><strong>Defect:</strong> ${data.defect_found === 'yes' ? `Yes - ${data.defect_type || 'N/A'}` : 'No'}</p>
+                    ${data.defect_found === 'yes' ? `<p><strong>Severity:</strong> ${data.defect_severity || 'N/A'}</p>` : ''}
+                </div>
+            `;
+            
+            reviewGrid.appendChild(card);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function editPhoto(index) {
+    currentPhotoIndex = index;
+    document.getElementById('reviewSection').classList.remove('active');
+    document.getElementById('detailsSection').classList.add('active');
+    loadPhotoDetails(index);
+    updatePhotoNavigation();
+}
+
+// ============================================================================
+// SUBMIT REPORT
+// ============================================================================
+
+async function submitReport() {
+    const completedCount = photoData.filter(d => Object.keys(d).length > 0).length;
+    
+    if (completedCount < uploadedPhotos.length) {
+        alert(`Warning: Only ${completedCount} of ${uploadedPhotos.length} photos have complete details.`);
+    }
+    
+    const submitBtn = document.getElementById('finalSubmitBtn');
     const btnText = submitBtn.querySelector('.btn-text');
     const btnLoader = submitBtn.querySelector('.btn-loader');
     
@@ -377,20 +446,20 @@ document.getElementById('reportForm').addEventListener('submit', async function(
     btnText.style.display = 'none';
     btnLoader.style.display = 'flex';
     
-    // Prepare form data
-    const formData = new FormData(this);
-    
-    // Add photos to form data
-    uploadedPhotos.forEach((photo, index) => {
-        formData.append(`photos[]`, photo);
-    });
-    
     try {
-        // DEMO MODE: Simulate submission
+        // Simulate submission
         await simulateSubmission();
         
         /* PRODUCTION CODE:
-        const response = await fetch('save-report.php', {
+        const formData = new FormData();
+        
+        // Add each photo with its data
+        uploadedPhotos.forEach((photo, index) => {
+            formData.append(`photos[]`, photo);
+            formData.append(`photo_data[]`, JSON.stringify(photoData[index] || {}));
+        });
+        
+        const response = await fetch('save-report-v2.php', {
             method: 'POST',
             body: formData
         });
@@ -398,94 +467,87 @@ document.getElementById('reportForm').addEventListener('submit', async function(
         const result = await response.json();
         
         if (result.success) {
-            alert('Report submitted successfully!');
-            window.location.href = 'home.php';
+            showToast('Report submitted successfully!', 'success');
+            setTimeout(() => window.location.href = 'home.php', 2000);
         } else {
-            alert('Error: ' + result.message);
-            resetSubmitButton(submitBtn, btnText, btnLoader);
+            throw new Error(result.message);
         }
         */
         
     } catch (error) {
         console.error('Submission error:', error);
-        alert('An error occurred while submitting the report.');
-        resetSubmitButton(submitBtn, btnText, btnLoader);
+        showToast('Error submitting report', 'error');
+        submitBtn.disabled = false;
+        btnText.style.display = 'block';
+        btnLoader.style.display = 'none';
     }
-});
+}
 
-// Simulate submission (Demo purposes)
 async function simulateSubmission() {
     return new Promise((resolve) => {
         setTimeout(() => {
-            alert('✓ Report submitted successfully!\n\nReport ID: RPT-2025-007\n\nRedirecting to dashboard...');
-            setTimeout(() => {
-                window.location.href = 'home.php';
-            }, 1000);
+            alert(`✓ Report submitted successfully!\n\nReport ID: RPT-2025-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}\nPhotos: ${uploadedPhotos.length}\nCompleted: ${photoData.filter(d => Object.keys(d).length > 0).length}\n\nRedirecting to dashboard...`);
+            setTimeout(() => window.location.href = 'home.php', 1000);
             resolve();
         }, 2000);
     });
 }
 
-function resetSubmitButton(submitBtn, btnText, btnLoader) {
-    submitBtn.disabled = false;
-    btnText.style.display = 'block';
-    btnLoader.style.display = 'none';
+// ============================================================================
+// NAVIGATION
+// ============================================================================
+
+function backToUpload() {
+    document.getElementById('detailsSection').classList.remove('active');
+    document.getElementById('uploadSection').classList.add('active');
+    updateProgressIndicator();
+}
+
+function backToDetails() {
+    document.getElementById('reviewSection').classList.remove('active');
+    document.getElementById('detailsSection').classList.add('active');
+    updateProgressIndicator();
 }
 
 // ============================================================================
-// UTILITY FUNCTIONS
+// PROGRESS INDICATOR
 // ============================================================================
 
-// Auto-save draft (optional feature)
-function autoSaveDraft() {
-    const formData = new FormData(document.getElementById('reportForm'));
-    const draftData = {};
+function updateProgressIndicator() {
+    const completedCount = photoData.filter(d => Object.keys(d).length > 0).length;
+    const totalCount = uploadedPhotos.length;
     
-    for (let [key, value] of formData.entries()) {
-        draftData[key] = value;
-    }
+    document.getElementById('detailsCount').textContent = `${completedCount} of ${totalCount} completed`;
     
-    // Save to localStorage
-    localStorage.setItem('reportDraft', JSON.stringify(draftData));
-    console.log('Draft auto-saved');
-}
-
-// Load draft (optional feature)
-function loadDraft() {
-    const draftData = localStorage.getItem('reportDraft');
-    if (draftData) {
-        const data = JSON.parse(draftData);
-        // Populate form fields with draft data
-        Object.keys(data).forEach(key => {
-            const field = document.querySelector(`[name="${key}"]`);
-            if (field) {
-                field.value = data[key];
-            }
-        });
+    // Update progress item states
+    if (completedCount === totalCount && totalCount > 0) {
+        document.getElementById('submitProgress').classList.add('active');
     }
 }
 
-// Clear draft
-function clearDraft() {
-    localStorage.removeItem('reportDraft');
+// ============================================================================
+// TOAST NOTIFICATIONS
+// ============================================================================
+
+function showToast(message, type = 'info') {
+    const icons = {
+        success: '✓',
+        error: '✗',
+        info: 'ℹ'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type]}</span>
+        <span class="toast-message">${message}</span>
+        <span class="toast-close" onclick="this.parentElement.remove()">×</span>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
-
-// Warn before leaving page if form is dirty
-let formIsDirty = false;
-
-document.getElementById('reportForm').addEventListener('input', function() {
-    formIsDirty = true;
-});
-
-window.addEventListener('beforeunload', function(e) {
-    if (formIsDirty) {
-        e.preventDefault();
-        e.returnValue = '';
-        return 'You have unsaved changes. Are you sure you want to leave?';
-    }
-});
-
-// Mark form as clean on successful submission
-document.getElementById('reportForm').addEventListener('submit', function() {
-    formIsDirty = false;
-});
