@@ -133,15 +133,19 @@ export default function Index() {
         last_modified: number;
     }>>([]);
 
-    const fetchPhotos = async () => {
+  const fetchPhotos = async () => {
         try {
-            const response = await fetch('/photos/all');
+            const response = await fetch('/photos/all'); // Use relative path
             const data = await response.json();
             
             if (data.success) {
-                setPhotos(data.photos);
-            } else {
-                console.error('Failed to fetch photos:', data.message);
+                // If your backend returns full URLs with different origin,
+                // you might need to convert them to relative paths
+                const photosWithFixedUrls = data.photos.map(photo => ({
+                    ...photo,
+                    url: photo.url.replace('http://localhost:8000', '') // Make relative
+                }));
+                setPhotos(photosWithFixedUrls);
             }
         } catch (error) {
             console.error('Error fetching photos:', error);
