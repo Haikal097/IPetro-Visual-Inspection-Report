@@ -35,6 +35,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 });
 
+Route::get('/reports/photo-report', function () {
+    return inertia('Reports/PhotoReport');
+})->middleware(['auth']);
+
+
 Route::prefix('api')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('reports', ReportController::class);
     Route::post('/reports/{id}/submit', [ReportController::class, 'submit']);

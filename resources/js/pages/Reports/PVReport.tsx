@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast, Toaster } from "react-hot-toast";
 import ipetroLogo from '@/assets/logo.png';
+import { router } from '@inertiajs/react';
 
 export interface FormState {
     title?: string; 
@@ -739,9 +740,9 @@ const generateAutoTitle = (formData: FormState): string => {
                                 </p>
                             </div>
                             
-                            {/* Action Buttons */}
+                            {/* Action Buttons 
                             <div className="flex flex-wrap gap-2">
-                                {/* Update your existing Save button */}
+                                {/* Update your existing Save button 
                                 <button
                                     onClick={() => handleSave('draft')}
                                     disabled={isSaving}
@@ -755,9 +756,9 @@ const generateAutoTitle = (formData: FormState): string => {
                                     className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
                                 >
                                     <Download className="h-4 w-4" />
-                                    Export JSON
+                                    Export JSON 
                                 </button>
-                            </div>
+                            </div>*/}
                         </div>
                     </div>
                 </div>
@@ -1072,7 +1073,7 @@ const generateAutoTitle = (formData: FormState): string => {
                                 <div>
                                     <PreviewSection form={form} handlePrint={handlePrint} />
                                     
-                                    {/* Add submit button in preview */}
+                                    {/* Add submit button in preview 
                                     <div className="mt-6 flex justify-end gap-4">
                                         <button
                                             onClick={() => handleSave('draft')}
@@ -1088,7 +1089,7 @@ const generateAutoTitle = (formData: FormState): string => {
                                         >
                                             {isSubmitting ? 'Submitting...' : 'Finalize & Submit'}
                                         </button>
-                                    </div>
+                                    </div>*/}
                                 </div>
                             )}
 
@@ -1138,16 +1139,12 @@ const generateAutoTitle = (formData: FormState): string => {
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        handleSave();
-                                                        toast.success('Report finalized! Ready for submission.', {
-                                                            icon: '✅',
-                                                            duration: 3000,
-                                                        });
+                                                        router.visit('/reports/photo-report');
                                                     }}
-                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-800 transition-colors flex items-center gap-2"
+                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors flex items-center gap-2"
                                                 >
                                                     <Check className="h-4 w-4" />
-                                                    Finalize Report
+                                                    Open Photo Report
                                                 </button>
                                             </div>
                                         ) : (
