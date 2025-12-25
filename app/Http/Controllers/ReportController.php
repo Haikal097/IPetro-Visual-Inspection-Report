@@ -217,4 +217,99 @@ class ReportController extends Controller
             'message' => 'Failed to approve report'
         ], 500);
     }
+
+    public function finalize(Request $request, Report $report)
+    {
+        $user = $request->user();
+
+        // Must have signature
+        if (!$user->signature_path || !Storage::disk('public')->exists($user->signature_path)) {
+            return back()->withErrors([
+                'signature' => 'Please create your digital signature before finalizing the report.',
+            ]);
+        }
+
+        // Stamp signing data
+        $report->inspector_id = $user->id;
+        $report->signed_at = now(); // timezone should be Asia/Kuala_Lumpur in config/app.php
+        $report->signed_ip = $request->ip();
+        $report->signed_user_agent = substr((string)$request->userAgent(), 0, 512);
+
+        // Generate verification token once
+        if (!$report->verification_token) {
+            $report->verification_token = Str::random(64);
+        }
+
+        // Snapshot signature
+        $snapshotSig = "reports/{$report->id}/signature.png";
+        Storage::disk('public')->copy($user->signature_path, $snapshotSig);
+        $report->signature_snapshot_path = $snapshotSig;
+
+        // Signature hash
+        $sigBytes = Storage::disk('public')->get($snapshotSig);
+        $report->signature_sha256 = hash('sha256', $sigBytes);
+
+        $report->save();
+
+        // Generate SIGNED PDF snapshot (freeze)
+        $pdfPath = "reports/{$report->id}/final_report.pdf";
+        $pdf = Pdf::loadView('reports.pdf', [
+            'report' => $report->fresh()->load('inspector'),
+        ]);
+
+        Storage::disk('public')->put($pdfPath, $pdf->output());
+        $report->pdf_snapshot_path = $pdfPath;
+
+        // PDF hash
+        $pdfBytes = Storage::disk('public')->get($pdfPath);
+        $report->pdf_sha256 = hash('sha256', $pdfBytes);
+
+        $report->save();
+
+        // Audit log (optional)
+        ReportAudit::create([
+            'report_id' => $report->id,
+            'user_id' => $user->id,
+            'action' => 'FINALIZED',
+            'meta' => [
+                'signed_ip' => $report->signed_ip,
+                'signed_at' => $report->signed_at?->toISOString(),
+            ],
+        ]);
+
+        return back()->with('success', 'Report finalized, signed, and PDF snapshot saved.');
+    }
+
+        public function download(Request $request, Report $report)
+    {
+        // Only allow if finalized
+        if (!$report->pdf_snapshot_path || !Storage::disk('public')->exists($report->pdf_snapshot_path)) {
+            return back()->withErrors(['pdf' => 'PDF not available. Finalize the report first.']);
+        }
+
+        // Audit optional
+        \App\Models\ReportAudit::create([
+            'report_id' => $report->id,
+            'user_id' => $request->user()->id,
+            'action' => 'DOWNLOADED_PDF',
+            'meta' => ['ip' => $request->ip()],
+        ]);
+
+        return Storage::disk('public')->download($report->pdf_snapshot_path, "REPORT-{$report->id}.pdf");
+    }
+
+        public function verify(string $token)
+    {
+        $report = \App\Models\Report::where('verification_token', $token)->firstOrFail();
+
+        return inertia('Reports/Verify', [
+            'report' => [
+                'id' => $report->id,
+                'signed_at' => optional($report->signed_at)->toISOString(),
+                'pdf_sha256' => $report->pdf_sha256,
+                'signature_sha256' => $report->signature_sha256,
+            ],
+        ]);
+    }
+
 }

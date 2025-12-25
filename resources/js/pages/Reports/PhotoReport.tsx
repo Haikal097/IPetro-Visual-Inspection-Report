@@ -96,6 +96,64 @@ function ensureShape(input: any): ReportData | null {
   };
 }
 
+
+function autoGrowOneLine(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+function autoGrow(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+
+
+}
+
+
+function ExpandableInput(props: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+  uppercase?: boolean;
+  bold?: boolean;
+  center?: boolean;
+}) {
+  const {
+    value,
+    onChange,
+    placeholder,
+    className = "",
+    uppercase,
+    bold,
+    center,
+  } = props;
+
+  return (
+    <textarea
+      rows={1}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onInput={(e) => autoGrowOneLine(e.currentTarget)}
+      onFocus={(e) => autoGrowOneLine(e.currentTarget)}
+      ref={(el) => autoGrowOneLine(el)}
+      className={[
+        "report-input",
+        "resize-none overflow-hidden",
+        "leading-6",
+        bold ? "font-bold" : "",
+        uppercase ? "uppercase" : "",
+        center ? "text-center" : "",
+        className,
+      ].join(" ")}
+    />
+  );
+}
+
+
 export default function PhotoReport() {
   const [data, setData] = useState<ReportData | null>(null);
   const [logoError, setLogoError] = useState(false);
@@ -357,39 +415,35 @@ export default function PhotoReport() {
               </tr>
               <tr>
                 <td className="p-1">
-                  <input
-                    type="text"
-                    className="report-input text-center h-full"
+                  <ExpandableInput
                     value={data.pmt}
-                    onChange={(e) => handleHeaderChange("pmt", e.target.value)}
+                    onChange={(v) => handleHeaderChange("pmt", v)}
                     placeholder="Enter PMT"
+                    center
                   />
                 </td>
                 <td className="p-1">
-                  <input
-                    type="text"
-                    className="report-input text-center h-full"
+                  <ExpandableInput
                     value={data.tag}
-                    onChange={(e) => handleHeaderChange("tag", e.target.value)}
+                    onChange={(v) => handleHeaderChange("tag", v)}
                     placeholder="Enter Tag No."
+                    center
                   />
                 </td>
                 <td className="p-1">
-                  <input
-                    type="text"
-                    className="report-input text-center h-full"
+                  <ExpandableInput
                     value={data.description}
-                    onChange={(e) => handleHeaderChange("description", e.target.value)}
+                    onChange={(v) => handleHeaderChange("description", v)}
                     placeholder="Enter Equipment Description"
+                    center
                   />
                 </td>
                 <td className="p-1">
-                  <input
-                    type="text"
-                    className="report-input text-center h-full"
+                  <ExpandableInput
                     value={data.plantUnit}
-                    onChange={(e) => handleHeaderChange("plantUnit", e.target.value)}
+                    onChange={(v) => handleHeaderChange("plantUnit", v)}
                     placeholder="Enter Plant/Unit"
+                    center
                   />
                 </td>
               </tr>
@@ -413,12 +467,12 @@ export default function PhotoReport() {
                   <td className="p-4 relative">
                     <div className="flex items-start mb-2 gap-2">
                       <span className="font-bold text-black mt-[6px]">{index + 1}.</span>
-                      <input
-                        type="text"
-                        className="report-input font-bold text-[#545454] w-full"
+                      <ExpandableInput
                         value={item.title}
-                        onChange={(e) => handleItemChange(item.id, "title", e.target.value)}
+                        onChange={(v) => handleItemChange(item.id, "title", v)}
                         placeholder="Enter item title..."
+                        bold
+                        className="text-[#545454] w-full"
                       />
                       <button
                         onClick={() => deleteItem(item.id)}
@@ -476,11 +530,15 @@ export default function PhotoReport() {
                       </select>
 
                       <textarea
-                        className="report-input w-full h-48 resize-none text-sm"
+                        className="report-input w-full resize-none text-sm min-h-[192px] overflow-hidden"
                         value={item.findings}
                         onChange={(e) => handleItemChange(item.id, "findings", e.target.value)}
+                        onInput={(e) => autoGrow(e.currentTarget)}
+                        onFocus={(e) => autoGrow(e.currentTarget)}
+                        ref={(el) => autoGrow(el)}
                         placeholder="Type findings here..."
                       />
+
                     </div>
                   </td>
 
@@ -506,11 +564,15 @@ export default function PhotoReport() {
                       </select>
 
                       <textarea
-                        className="report-input w-full h-48 resize-none text-sm"
-                        value={item.requirements}
-                        onChange={(e) => handleItemChange(item.id, "requirements", e.target.value)}
-                        placeholder="Type requirements..."
-                      />
+                          className="report-input w-full resize-none text-sm min-h-[192px] overflow-hidden"
+                          value={item.requirements}
+                          onChange={(e) => handleItemChange(item.id, "requirements", e.target.value)}
+                          onInput={(e) => autoGrow(e.currentTarget)}
+                          onFocus={(e) => autoGrow(e.currentTarget)}
+                          ref={(el) => autoGrow(el)}
+                          placeholder="Type requirements..."
+                        />
+
                     </div>
                   </td>
                 </tr>

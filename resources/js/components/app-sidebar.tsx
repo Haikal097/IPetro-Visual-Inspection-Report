@@ -32,6 +32,11 @@ const mainNavItems: NavItem[] = [
         href: '/report',
         icon: FileText,
     },
+    { 
+        title: "Calendar", 
+        href: "/calendar", 
+        icon: Folder,
+    },
 ];
 
 const footerNavItems: NavItem[] = [

@@ -437,7 +437,7 @@ export default function Dashboard() {
                             {/* Action buttons - flex-grow to fill space */}
                             <div className="flex-1 space-y-4">
                             <Link
-                                href="/reports/create"
+                                href="/pv-report"
                                 className="group flex items-center justify-between rounded-xl border border-red-200/50 bg-white p-4 transition-all hover:border-red-300 hover:bg-red-50/50 hover:shadow-md hover:shadow-red-200/30 dark:border-red-900/30 dark:bg-gray-800 dark:hover:border-red-800 dark:hover:bg-red-900/20 dark:hover:shadow-red-900/20"
                             >
                                 <div className="flex items-center gap-3">
