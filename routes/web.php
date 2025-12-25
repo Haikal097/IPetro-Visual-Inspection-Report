@@ -33,6 +33,65 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Reports/PVReport');
     });
 
+Route::get('/admin', function () {
+    return inertia('Admin/Index', [
+        'users' => [
+            // Make sure this array exists
+            [
+                'id' => 1,
+                'name' => 'Test User',
+                'email' => 'test@ipetro.com',
+                'role' => 'admin',
+                'status' => 'active',
+                'lastLogin' => 'Today'
+            ]
+        ],
+        'stats' => [
+            'totalUsers' => 1,
+            'activeUsers' => 1,
+            'newUsers' => 0,
+            'pendingUsers' => 0
+        ]
+    ]);
+});
+Route::get('/admin/users', function () {
+    $users = [
+        [
+            'id' => 1,
+            'name' => 'John Anderson',
+            'email' => 'john.anderson@ipetro.com',
+            'phone' => '+1 (555) 123-4567',
+            'role' => 'admin',
+            'status' => 'active',
+            'lastLogin' => 'Today, 9:42 AM',
+            'createdAt' => '2024-01-15',
+            'lastActive' => '2 minutes ago',
+            'avatarColor' => '#CD202C'
+        ],
+        [
+            'id' => 2,
+            'name' => 'Sarah Johnson',
+            'email' => 'sarah.johnson@ipetro.com',
+            'phone' => '+1 (555) 987-6543',
+            'role' => 'inspector',
+            'status' => 'active',
+            'lastLogin' => 'Yesterday, 3:20 PM',
+            'createdAt' => '2024-01-10',
+            'lastActive' => '1 hour ago',
+            'avatarColor' => '#1e40af'
+        ],
+        // Add more users...
+    ];
+
+    return inertia('Admin/Users', [
+        'users' => $users,
+        'totalUsers' => count($users),
+        'activeUsers' => 2,
+        'newUsersThisMonth' => 1,
+        'inactiveUsers' => 0
+    ]);
+})->name('admin.users');
+
 });
 
 Route::get('/reports/photo-report', function () {
