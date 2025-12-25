@@ -16,6 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // Add middleware aliases here
+        $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class,
+            // You can add other custom middleware aliases here too
+            // 'permission' => \App\Http\Middleware\CheckPermission::class,
+        ]);
+
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,

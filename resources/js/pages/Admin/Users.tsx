@@ -1,5 +1,5 @@
-import { Head } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, useForm, usePage, Link, router } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
 import { 
   Users, Search, UserPlus, Eye, Edit, Lock, Trash2,
   UserCheck, UserX, Mail, Download, Filter, CheckCircle,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from '@/layouts/AdminLayout';
 
+
 interface User {
   id: number;
   name: string;
@@ -16,9 +17,8 @@ interface User {
   phone?: string;
   role: 'admin' | 'inspector' | 'reviewer' | 'viewer';
   status: 'active' | 'inactive' | 'pending' | 'suspended';
-  createdAt: string;
-  
-  lastActive?: string;
+  created_at: string;
+  updated_at: string;
   avatarColor?: string;
 }
 
@@ -48,7 +48,16 @@ export default function UserManagement({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Filter users
+  // Inertia form for creating/updating users
+  const userForm = useForm({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'viewer' as User['role'],
+    status: 'pending' as User['status'],
+  });
+
+  // Filter users (client-side filtering for now)
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -65,7 +74,7 @@ export default function UserManagement({
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
 
-  // Helper functions
+  // Helper functions (same as before)
   const getRoleColor = (role: User['role']) => {
     const colors = {
       admin: 'bg-red-100 text-red-800 border-red-200',
@@ -86,7 +95,7 @@ export default function UserManagement({
     return colors[status] || colors.inactive;
   };
 
-  const getStatusIcon = (status: User['status']) => {
+const getStatusIcon = (status: User['status']) => {
     switch(status) {
       case 'active': return <CheckCircle className="w-4 h-4" />;
       case 'inactive': return <UserX className="w-4 h-4" />;
@@ -96,96 +105,109 @@ export default function UserManagement({
     }
   };
 
-  // User actions
+  // User actions using Inertia
   const handleToggleStatus = (userId: number, newStatus?: User['status']) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { 
-            ...user, 
-            status: newStatus || (user.status === 'active' ? 'inactive' : 'active') 
-          }
-        : user
-    ));
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    const targetStatus = newStatus || (user.status === 'active' ? 'inactive' : 'active');
+    
+    router.patch(route('admin.users.updateStatus', { user: userId }), {
+      status: targetStatus
+    }, {
+      onSuccess: () => {
+        // Update local state on success
+        setUsers(users.map(u => 
+          u.id === userId ? { ...u, status: targetStatus } : u
+        ));
+      }
+    });
   };
 
   const handleDeleteUser = (userId: number) => {
-    setUsers(users.filter(user => user.id !== userId));
-    setShowDeleteConfirm(false);
-    setUserToDelete(null);
+    router.delete(route('admin.users.destroy', { user: userId }), {
+      onSuccess: () => {
+        // Remove from local state
+        setUsers(users.filter(user => user.id !== userId));
+        setShowDeleteConfirm(false);
+        setUserToDelete(null);
+      }
+    });
   };
 
   const handleResetPassword = (userId: number) => {
-    alert(`Password reset email sent to user ${userId}`);
+    if (confirm('Are you sure you want to reset this user\'s password?')) {
+      router.post(route('admin.users.resetPassword', { user: userId }), {}, {
+        onSuccess: () => {
+          alert('Password reset email has been sent to the user.');
+        }
+      });
+    }
   };
 
   const handleAddUser = () => {
-    const newId = users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1;
-    const newUser: User = {
-      id: newId,
-      name: 'New User',
-      email: `user${newId}@ipetro.com`,
-      role: 'viewer',
-      status: 'pending',
-      createdAt: new Date().toISOString().split('T')[0],
-      avatarColor: getRandomColor()
-    };
-    setUsers([...users, newUser]);
-    setEditingUser(newUser);
+    userForm.reset();
+    setEditingUser(null);
     setShowUserModal(true);
   };
 
   const handleEditUser = (user: User) => {
-    setEditingUser({ ...user });
+    userForm.setData({
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      status: user.status,
+    });
+    setEditingUser(user);
     setShowUserModal(true);
   };
 
   const handleSaveUser = () => {
     if (editingUser) {
-      if (editingUser.id === 0) {
-        // New user
-        const newId = users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1;
-        setUsers([...users, { ...editingUser, id: newId }]);
-      } else {
-        // Update existing user
-        setUsers(users.map(user => 
-          user.id === editingUser.id ? editingUser : user
-        ));
-      }
-      setShowUserModal(false);
-      setEditingUser(null);
+      // Update existing user
+      router.put(route('admin.users.update', { user: editingUser.id }), userForm.data(), {
+        onSuccess: () => {
+          setShowUserModal(false);
+          setEditingUser(null);
+          userForm.reset();
+          // Refresh page to get updated data
+          router.reload();
+        }
+      });
+    } else {
+      // Create new user
+      router.post(route('admin.users.store'), userForm.data(), {
+        onSuccess: () => {
+          setShowUserModal(false);
+          userForm.reset();
+          // Refresh page to get updated data
+          router.reload();
+        }
+      });
     }
   };
 
   const handleBulkAction = () => {
     if (!bulkAction || selectedUsers.length === 0) return;
 
-    switch(bulkAction) {
-      case 'activate':
-        setUsers(users.map(user => 
-          selectedUsers.includes(user.id) 
-            ? { ...user, status: 'active' }
-            : user
-        ));
-        break;
-      case 'deactivate':
-        setUsers(users.map(user => 
-          selectedUsers.includes(user.id) 
-            ? { ...user, status: 'inactive' }
-            : user
-        ));
-        break;
-      case 'delete':
-        if (confirm(`Delete ${selectedUsers.length} selected users?`)) {
-          setUsers(users.filter(user => !selectedUsers.includes(user.id)));
-          setSelectedUsers([]);
-        }
-        break;
-      case 'send_email':
-        alert(`Sending email to ${selectedUsers.length} users`);
-        break;
+    if (bulkAction === 'delete' && !confirm(`Delete ${selectedUsers.length} selected users?`)) {
+      return;
     }
-    setBulkAction('');
+
+    router.post(route('admin.users.bulkActions'), {
+      user_ids: selectedUsers,
+      action: bulkAction,
+    }, {
+      onSuccess: () => {
+        setBulkAction('');
+        setSelectedUsers([]);
+        // Refresh page to get updated data
+        router.reload();
+      }
+    });
   };
+
 
   const toggleSelectUser = (userId: number) => {
     setSelectedUsers(prev => 
@@ -532,132 +554,135 @@ export default function UserManagement({
       </div>
 
       {/* User Modal */}
-      {showUserModal && editingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {editingUser.id === 0 ? 'Add New User' : 'Edit User'}
-                </h2>
-                <button 
-                  onClick={() => {
-                    setShowUserModal(false);
-                    setEditingUser(null);
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
-                    value={editingUser.name}
-                    onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
-                    value={editingUser.email}
-                    onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
-                    value={editingUser.phone || ''}
-                    onChange={(e) => setEditingUser({...editingUser, phone: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
-                    value={editingUser.role}
-                    onChange={(e) => setEditingUser({...editingUser, role: e.target.value as User['role']})}
+        {showUserModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {editingUser ? 'Edit User' : 'Add New User'}
+                  </h2>
+                  <button 
+                    onClick={() => {
+                      setShowUserModal(false);
+                      setEditingUser(null);
+                      userForm.reset();
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg"
                   >
-                    <option value="admin">Administrator</option>
-                    <option value="inspector">Inspector</option>
-                    <option value="reviewer">Reviewer</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
-                    value={editingUser.status}
-                    onChange={(e) => setEditingUser({...editingUser, status: e.target.value as User['status']})}
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="pending">Pending</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
-                    value={editingUser.location || ''}
-                    onChange={(e) => setEditingUser({...editingUser, location: e.target.value})}
-                    placeholder="City, Country"
-                  />
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setShowUserModal(false);
-                    setEditingUser(null);
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveUser}
-                  className="px-4 py-2 bg-[#CD202C] text-white rounded-lg hover:bg-[#B81C26] flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  Save User
-                </button>
-              </div>
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveUser(); }}>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                        value={userForm.data.name}
+                        onChange={(e) => userForm.setData('name', e.target.value)}
+                        required
+                      />
+                      {userForm.errors.name && (
+                        <p className="text-red-500 text-sm mt-1">{userForm.errors.name}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                        value={userForm.data.email}
+                        onChange={(e) => userForm.setData('email', e.target.value)}
+                        required
+                      />
+                      {userForm.errors.email && (
+                        <p className="text-red-500 text-sm mt-1">{userForm.errors.email}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                        value={userForm.data.phone}
+                        onChange={(e) => userForm.setData('phone', e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Role *
+                      </label>
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                        value={userForm.data.role}
+                        onChange={(e) => userForm.setData('role', e.target.value as User['role'])}
+                        required
+                      >
+                        <option value="admin">Administrator</option>
+                        <option value="inspector">Inspector</option>
+                        <option value="reviewer">Reviewer</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Status *
+                      </label>
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                        value={userForm.data.status}
+                        onChange={(e) => userForm.setData('status', e.target.value as User['status'])}
+                        required
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="pending">Pending</option>
+                        <option value="suspended">Suspended</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserModal(false);
+                        setEditingUser(null);
+                        userForm.reset();
+                      }}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={userForm.processing}
+                      className="px-4 py-2 bg-[#CD202C] text-white rounded-lg hover:bg-[#B81C26] flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {userForm.processing ? 'Saving...' : 'Save User'}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
