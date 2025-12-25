@@ -254,4 +254,14 @@ class Report extends Model
             }
         });
     }
+
+
+    // app/Models/Report.php
+
+    public function inspector()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'inspector_id');
+    }
+
+
 }

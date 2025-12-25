@@ -312,4 +312,55 @@ class ReportController extends Controller
         ]);
     }
 
+    private function reportChecklist($report, $user)
+{
+    $data = $report->json_data ? json_decode($report->json_data, true) : [];
+
+    $hasEquipment = !empty($data['equipment'] ?? null);
+    $hasFindings  = !empty($data['findings'] ?? null);
+    $hasReco      = !empty($data['recommendations'] ?? null);
+
+    $hasSignature = !empty($user->signature_path);
+
+    return [
+        'equipment' => $hasEquipment,
+        'findings' => $hasFindings,
+        'recommendations' => $hasReco,
+        'signature' => $hasSignature,
+        'ready' => ($hasEquipment && $hasFindings && $hasReco && $hasSignature),
+    ];
+}
+
+    public function pvReport()
+    {
+        $u = auth()->user();
+
+        // if you store draft in session/localStorage only, backend can't read it.
+        // so either:
+        // 1) compute checklist on frontend from `form`, OR
+        // 2) store draft in DB and load it here.
+
+        $signatureUrl = $u?->signature_path
+            ? asset('storage/' . $u->signature_path)
+            : null;
+
+        return Inertia::render('Reports/PVReport', [
+            'signatureUrl' => $signatureUrl,
+            'checklist' => [
+                // ✅ TEMP: keep them false until you compute from DB or frontend
+                'equipment' => false,
+                'initial' => false,
+                'external' => false,
+                'internal' => false,
+                'ndt' => false,
+                'recommendations' => false,
+
+                'signature' => !empty($u?->signature_path),
+
+                // ready = all true
+                'ready' => !empty($u?->signature_path), // update later
+            ],
+        ]);
+    }
+
 }

@@ -25,6 +25,8 @@ import {
 import { toast, Toaster } from "react-hot-toast";
 import ipetroLogo from '@/assets/logo.png';
 import { router } from '@inertiajs/react';
+import { usePage } from "@inertiajs/react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 export interface FormState {
     title?: string; 
@@ -40,6 +42,11 @@ export interface FormState {
     internalFinding: string;
     ndt: string;
     recommendations: string;
+
+    inspectorName: string;
+    publishDate: string; // dd/mm/yyyy or yyyy-mm-dd (we’ll format)
+
+
 }
 
 interface PresetItem {
@@ -60,6 +67,56 @@ interface TemplateInfo {
 
 export default function PVReport() {
     const [form, setForm] = useState<FormState>(getInitialFormState());
+    const page = usePage().props as any;
+
+    const user = page.auth?.user;
+
+    useEffect(() => {
+    setForm((prev) => {
+        const next = { ...prev };
+
+        // ✅ only fill if empty (don’t overwrite user edits)
+        if (!next.inspectorName?.trim() && user?.name) {
+        next.inspectorName = user.name;
+        }
+
+        // ✅ publishDate default: same as reportDate (or today)
+        if (!next.publishDate) {
+        next.publishDate = next.reportDate || new Date().toISOString().split("T")[0];
+        }
+
+        return next;
+    });
+    }, [user?.name]);
+
+
+    // ✅ signature still from backend user/profile
+        const signatureUrl =
+    page.signatureUrl ??
+    (page.auth?.user?.signature_path
+        ? `/storage/${page.auth.user.signature_path}`
+        : null);
+
+    // ✅ checklist computed from form (frontend), not backend
+    const checklist = {
+    equipment: !!(
+        form.equipmentTag?.trim() &&
+        form.equipmentType?.trim() &&
+        form.reportNo?.trim() &&
+        form.plantUnitArea?.trim() &&
+        form.doshRegistration?.trim()
+    ),
+    initial: !!form.initialFinding?.trim(),
+    external: !!form.externalFinding?.trim(),
+    internal: !!form.internalFinding?.trim(),
+    ndt: !!form.ndt?.trim(),
+    recommendations: !!form.recommendations?.trim(),
+    signature: !!signatureUrl,
+    };
+
+// ✅ ready = all true
+const ready = Object.values(checklist).every(Boolean);
+
     const [showPreview, setShowPreview] = useState(false);
     const [activeSection, setActiveSection] = useState<string>("details");
     const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -166,6 +223,8 @@ export default function PVReport() {
             internalFinding: "",
             ndt: "",
             recommendations: "",
+            inspectorName: "",
+            publishDate: today,
         };
     }
 
@@ -188,6 +247,8 @@ export default function PVReport() {
 
         return () => clearTimeout(saveTimeout);
     }, [form]);
+
+    
 
     // Handle form changes
     const handleChange = (field: keyof FormState) => 
@@ -569,6 +630,37 @@ const generateAutoTitle = (formData: FormState): string => {
                             <td style="min-height: 40px; white-space: pre-wrap;">${form.recommendations || "No recommendations provided"}</td>
                         </tr>
                     </table>
+
+                   
+                    <!-- Inspector Verification (Auto) -->
+                        <h2 style="font-size: 14pt; font-weight: bold; margin: 20px 0 10px 0; text-transform: uppercase;">
+                        5. INSPECTOR VERIFICATION
+                        </h2>
+
+                        <table>
+                        <tr>
+                            <th style="width: 25%; text-align: center;">Inspector Name</th>
+                            <td>${form.inspectorName || (page?.auth?.user?.name ?? "________________")}</td>
+                        </tr>
+
+                        <tr>
+                            <th style="width: 25%; text-align: center;">Inspector Signature</th>
+                            <td style="height: 50px;">
+                            ${
+                                signatureUrl
+                                ? `<img src="${window.location.origin}${signatureUrl}" style="height:40px; object-fit:contain;" />`
+                                : "______________________"
+                            }
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th style="width: 25%; text-align: center;">Publish Date</th>
+                            <td>${formatDateForPrint(form.publishDate || form.reportDate)}</td>
+                        </tr>
+                        </table>
+
+
 
                     <!-- Signatures & Approvals -->
                     <div style="margin-top: 30px;">
@@ -1070,28 +1162,66 @@ const generateAutoTitle = (formData: FormState): string => {
 
                             {/* Preview Section */}
                             {activeSection === "preview" && (
-                                <div>
-                                    <PreviewSection form={form} handlePrint={handlePrint} />
-                                    
-                                    {/* Add submit button in preview 
-                                    <div className="mt-6 flex justify-end gap-4">
-                                        <button
-                                            onClick={() => handleSave('draft')}
-                                            disabled={isSaving}
-                                            className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
-                                        >
-                                            {isSaving ? 'Saving...' : 'Save as Draft'}
-                                        </button>
-                                        <button
-                                            onClick={handleSubmit}
-                                            disabled={isSubmitting}
-                                            className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors"
-                                        >
-                                            {isSubmitting ? 'Submitting...' : 'Finalize & Submit'}
-                                        </button>
-                                    </div>*/}
+                                <div className="space-y-6">
+                                    {/* ✅ Checklist UI */}
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                        Report Checklist
+                                    </h3>
+
+                                    <div className="space-y-3 text-sm">
+                                        <ChecklistRow label="Equipment details completed" ok={checklist.equipment} />
+                                        <ChecklistRow label="Initial findings filled" ok={checklist.initial} />
+                                        <ChecklistRow label="External findings filled" ok={checklist.external} />
+                                        <ChecklistRow label="Internal findings filled" ok={checklist.internal} />
+                                        <ChecklistRow label="NDT results filled" ok={checklist.ndt} />
+                                        <ChecklistRow label="Recommendations filled" ok={checklist.recommendations} />
+                                        <ChecklistRow label="Signature saved" ok={checklist.signature} />
+                                    </div>
+
+                                    {/* Signature preview */}
+                                    <div className="mt-4">
+                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Inspector Signature Preview
+                                        </p>
+
+                                        {signatureUrl ? (
+                                        <img
+                                            src={signatureUrl}
+                                            alt="Inspector signature"
+                                            className="h-20 border rounded bg-white p-2"
+                                        />
+                                        ) : (
+                                        <div className="text-sm text-red-600">
+                                            No signature found. Please save your signature first at{" "}
+                                            <button
+                                            onClick={() => router.visit("/profile/signature")}
+                                            className="underline font-semibold"
+                                            >
+                                            Signature Page
+                                            </button>
+                                        </div>
+                                        )}
+                                    </div>
+
+                                    {/* Example: disable print if not ready */}
+                                    {!checklist?.ready && (
+                                        <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                                        ⚠️ Complete all required sections and save your signature before finalizing/printing.
+                                        </div>
+                                    )}
+                                    </div>
+
+                                    {/* Existing preview */}
+                                    <PreviewSection
+                                        form={form}
+                                        handlePrint={handlePrint}
+                                        signatureUrl={signatureUrl}
+                                        />
+
                                 </div>
-                            )}
+                                )}
+
 
                             {/* Navigation Footer */}
                             <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -1189,95 +1319,114 @@ const generateAutoTitle = (formData: FormState): string => {
     );
 }
 
+function ChecklistRow({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-gray-700 dark:text-gray-300">{label}</span>
+      {ok ? (
+        <span className="inline-flex items-center gap-1 text-green-600 font-semibold">
+          <CheckCircle2 className="h-4 w-4" /> OK
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-red-600 font-semibold">
+          <XCircle className="h-4 w-4" /> Missing
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Text Area Section Component
 interface TextAreaSectionProps {
-    title: string;
-    description: string;
-    icon: React.ComponentType<any>;
-    value: string;
-    onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
-    placeholder: string;
-    wordCount: number;
-    onCopy: () => void;
-    copied: boolean;
+  title: string;
+  description: string;
+  icon: React.ComponentType<any>;
+  value: string;
+  onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder: string;
+  wordCount: number;
+  onCopy: () => void;
+  copied: boolean;
 }
 
 function TextAreaSection({
-    title,
-    description,
-    icon: Icon,
-    value,
-    onChange,
-    placeholder,
-    wordCount,
-    onCopy,
-    copied
+  title,
+  description,
+  icon: Icon,
+  value,
+  onChange,
+  placeholder,
+  wordCount,
+  onCopy,
+  copied,
 }: TextAreaSectionProps) {
-    return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-start justify-between mb-6">
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                            <Icon className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
-                        </div>
-                    </div>
-                </div>
-                <button
-                    onClick={onCopy}
-                    className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
-                >
-                    {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                    {copied ? 'Copied!' : 'Copy'}
-                </button>
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+              <Icon className="h-5 w-5 text-white" />
             </div>
-
-            <div className="space-y-4">
-                <div className="relative">
-                    <textarea
-                        value={value}
-                        onChange={onChange}
-                        className="w-full min-h-[200px] rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all resize-y"
-                        placeholder={placeholder}
-                        rows={10}
-                    />
-                    <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {wordCount} words
-                        </span>
-                    </div>
-                </div>
-
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
-                    <div className="flex items-start gap-3">
-                        <HelpCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <div>
-                            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Formatting Tips</h4>
-                            <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                                <li>• Use bullet points or numbered lists for clarity</li>
-                                <li>• Include specific locations and measurements</li>
-                                <li>• Note any deviations from previous inspections</li>
-                                <li>• Reference applicable standards (ASME, API, etc.)</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
             </div>
+          </div>
         </div>
-    );
+
+        <button
+          onClick={onCopy}
+          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
+        >
+          {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+          {copied ? "Copied!" : "Copy"}
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className="relative">
+          <textarea
+            value={value}
+            onChange={onChange}
+            className="w-full min-h-[200px] rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all resize-y"
+            placeholder={placeholder}
+            rows={10}
+          />
+          <div className="absolute bottom-3 right-3 flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400">{wordCount} words</span>
+          </div>
+        </div>
+
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
+          <div className="flex items-start gap-3">
+            <HelpCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white">Formatting Tips</h4>
+              <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                <li>• Use bullet points or numbered lists for clarity</li>
+                <li>• Include specific locations and measurements</li>
+                <li>• Note any deviations from previous inspections</li>
+                <li>• Reference applicable standards (ASME, API, etc.)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
+
+
 
 // Preview Section Component
 interface PreviewSectionProps {
-    form: FormState;
-    handlePrint: () => void; // Add this line
+  form: FormState;
+  handlePrint: () => void;
+  signatureUrl: string | null; // ✅ add
 }
 
-function PreviewSection({ form, handlePrint }: PreviewSectionProps) {
+function PreviewSection({ form, handlePrint, signatureUrl }: PreviewSectionProps) {
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
@@ -1493,6 +1642,46 @@ function PreviewSection({ form, handlePrint }: PreviewSectionProps) {
                     </tbody>
                 </table>
 
+                <h2 style={{ fontSize: '14pt', fontWeight: 'bold', margin: '20px 0 10px 0', textTransform: 'uppercase' }}>
+                    5. INSPECTOR VERIFICATION
+                    </h2>
+
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11pt' }}>
+                    <tbody>
+                        <tr>
+                        <th style={{ width: '25%', textAlign: 'center', border: '1px solid #000', background: '#f0f0f0' }}>
+                            Inspector Name
+                        </th>
+                        <td style={{ border: '1px solid #000', padding: '6px' }}>
+                            {form.inspectorName}
+                        </td>
+                        </tr>
+
+                        <tr>
+                        <th style={{ textAlign: 'center', border: '1px solid #000', background: '#f0f0f0' }}>
+                            Inspector Signature
+                        </th>
+                        <td style={{ border: '1px solid #000', padding: '6px', height: '50px' }}>
+                            {signatureUrl ? (
+                            <img src={signatureUrl} style={{ height: '40px', objectFit: 'contain' }} />
+                            ) : (
+                            "______________________"
+                            )}
+                        </td>
+                        </tr>
+
+                        <tr>
+                        <th style={{ textAlign: 'center', border: '1px solid #000', background: '#f0f0f0' }}>
+                            Publish Date
+                        </th>
+                        <td style={{ border: '1px solid #000', padding: '6px' }}>
+                            {formatDate(form.publishDate || form.reportDate)}
+                        </td>
+                        </tr>
+                    </tbody>
+                    </table>
+
+
                 {/* Signatures & Approvals */}
                 <div style={{ marginTop: '30px' }}>
                     <h3 style={{ fontSize: '12pt', fontWeight: 'bold', margin: '0 0 20px 0', paddingBottom: '5px', borderBottom: '1px solid #000' }}>
@@ -1582,4 +1771,8 @@ function PreviewSection({ form, handlePrint }: PreviewSectionProps) {
             </div>
         </div>
     );
+
+    
+
+    
 }
