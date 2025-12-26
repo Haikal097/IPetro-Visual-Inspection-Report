@@ -36,15 +36,13 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'phone' => 'nullable|string|max:20',
-            'role' => 'required|in:admin,reviewer,viewer,inspector',
-            'status' => 'required|in:active,inactive,pending,suspended',
+            'role' => 'required|in:admin,reviewer,inspector',
+            'status' => 'required|in:active,inactive',
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
             'status' => $validated['status'],
             'password' => Hash::make('password123'), // Default password
@@ -61,9 +59,8 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'phone' => 'nullable|string|max:20',
-            'role' => 'required|in:admin,reviewer,viewer,inspector',
-            'status' => 'required|in:active,inactive,pending,suspended',
+            'role' => 'required|in:admin,reviewer,inspector',
+            'status' => 'required|in:active,inactive',
         ]);
 
         $user->update($validated);
@@ -77,7 +74,7 @@ class UserController extends Controller
     public function updateStatus(Request $request, User $user)
     {
         $request->validate([
-            'status' => 'required|in:active,inactive,pending,suspended',
+            'status' => 'required|in:active,inactive',
         ]);
 
         $user->update([

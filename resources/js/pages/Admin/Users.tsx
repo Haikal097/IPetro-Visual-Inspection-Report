@@ -14,12 +14,18 @@ interface User {
   id: number;
   name: string;
   email: string;
-  phone?: string;
-  role: 'admin' | 'inspector' | 'reviewer' | 'viewer';
-  status: 'active' | 'inactive' | 'pending' | 'suspended';
+  phone?: string; // Note: Your table doesn't have phone column!
+  role: 'admin' | 'inspector' | 'reviewer';
+  status: 'active' | 'inactive'; // Only these two values
   created_at: string;
   updated_at: string;
-  avatarColor?: string;
+  signature_path?: string;
+  signature_updated_at?: string;
+  email_verified_at?: string;
+  two_factor_secret?: string;
+  two_factor_recovery_codes?: string;
+  two_factor_confirmed_at?: string;
+  remember_token?: string;
 }
 
 interface UserManagementProps {
@@ -52,9 +58,8 @@ export default function UserManagement({
   const userForm = useForm({
     name: '',
     email: '',
-    phone: '',
-    role: 'viewer' as User['role'],
-    status: 'pending' as User['status'],
+    role: 'admin' as User['role'],
+    status: 'active' as User['status'],
   });
 
   // Filter users (client-side filtering for now)
@@ -80,16 +85,14 @@ export default function UserManagement({
       admin: 'bg-red-100 text-red-800 border-red-200',
       inspector: 'bg-blue-100 text-blue-800 border-blue-200',
       reviewer: 'bg-purple-100 text-purple-800 border-purple-200',
-      viewer: 'bg-gray-100 text-gray-800 border-gray-200'
     };
-    return colors[role] || colors.viewer;
+    return colors[role];
   };
 
   const getStatusColor = (status: User['status']) => {
     const colors = {
       active: 'bg-green-100 text-green-800 border-green-200',
       inactive: 'bg-gray-100 text-gray-800 border-gray-200',
-      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       suspended: 'bg-red-100 text-red-800 border-red-200'
     };
     return colors[status] || colors.inactive;
@@ -99,8 +102,6 @@ const getStatusIcon = (status: User['status']) => {
     switch(status) {
       case 'active': return <CheckCircle className="w-4 h-4" />;
       case 'inactive': return <UserX className="w-4 h-4" />;
-      case 'pending': return <Clock className="w-4 h-4" />;
-      case 'suspended': return <Ban className="w-4 h-4" />;
       default: return <UserX className="w-4 h-4" />;
     }
   };
@@ -112,36 +113,35 @@ const getStatusIcon = (status: User['status']) => {
 
     const targetStatus = newStatus || (user.status === 'active' ? 'inactive' : 'active');
     
-    router.patch(route('admin.users.updateStatus', { user: userId }), {
-      status: targetStatus
+    router.patch(`/admin/users/${userId}/status`, {
+    status: targetStatus,
     }, {
-      onSuccess: () => {
-        // Update local state on success
-        setUsers(users.map(u => 
-          u.id === userId ? { ...u, status: targetStatus } : u
+    onSuccess: () => {
+        setUsers(users.map(u =>
+        u.id === userId ? { ...u, status: targetStatus } : u
         ));
-      }
+    },
     });
+
   };
 
   const handleDeleteUser = (userId: number) => {
-    router.delete(route('admin.users.destroy', { user: userId }), {
-      onSuccess: () => {
-        // Remove from local state
+    router.delete(`/admin/users/${userId}`, {
+    onSuccess: () => {
         setUsers(users.filter(user => user.id !== userId));
         setShowDeleteConfirm(false);
         setUserToDelete(null);
-      }
+    },
     });
   };
 
   const handleResetPassword = (userId: number) => {
     if (confirm('Are you sure you want to reset this user\'s password?')) {
-      router.post(route('admin.users.resetPassword', { user: userId }), {}, {
+        router.post(`/admin/users/${userId}/reset-password`, {}, {
         onSuccess: () => {
-          alert('Password reset email has been sent to the user.');
-        }
-      });
+            alert('Password reset email has been sent to the user.');
+        },
+        });
     }
   };
 
@@ -155,7 +155,6 @@ const getStatusIcon = (status: User['status']) => {
     userForm.setData({
       name: user.name,
       email: user.email,
-      phone: user.phone || '',
       role: user.role,
       status: user.status,
     });
@@ -163,30 +162,27 @@ const getStatusIcon = (status: User['status']) => {
     setShowUserModal(true);
   };
 
-  const handleSaveUser = () => {
+    const handleSaveUser = () => {
     if (editingUser) {
-      // Update existing user
-      router.put(route('admin.users.update', { user: editingUser.id }), userForm.data(), {
+        router.put(`/admin/users/${editingUser.id}`, userForm.data, {
         onSuccess: () => {
-          setShowUserModal(false);
-          setEditingUser(null);
-          userForm.reset();
-          // Refresh page to get updated data
-          router.reload();
-        }
-      });
+            setShowUserModal(false);
+            setEditingUser(null);
+            userForm.reset();
+            router.reload();
+        },
+        });
     } else {
-      // Create new user
-      router.post(route('admin.users.store'), userForm.data(), {
+        router.post('/admin/users', userForm.data, {
         onSuccess: () => {
-          setShowUserModal(false);
-          userForm.reset();
-          // Refresh page to get updated data
-          router.reload();
-        }
-      });
+            setShowUserModal(false);
+            userForm.reset();
+            router.reload();
+        },
+        });
     }
-  };
+    };
+
 
   const handleBulkAction = () => {
     if (!bulkAction || selectedUsers.length === 0) return;
@@ -195,17 +191,17 @@ const getStatusIcon = (status: User['status']) => {
       return;
     }
 
-    router.post(route('admin.users.bulkActions'), {
-      user_ids: selectedUsers,
-      action: bulkAction,
+    router.post('/admin/users/bulk-actions', {
+    user_ids: selectedUsers,
+    action: bulkAction,
     }, {
-      onSuccess: () => {
+    onSuccess: () => {
         setBulkAction('');
         setSelectedUsers([]);
-        // Refresh page to get updated data
         router.reload();
-      }
+    },
     });
+
   };
 
 
@@ -311,7 +307,6 @@ const getStatusIcon = (status: User['status']) => {
               >
                 <option value="">Bulk Actions</option>
                 <option value="activate">Activate Selected</option>
-                <option value="deactivate">Deactivate Selected</option>
                 <option value="send_email">Send Email</option>
                 <option value="delete">Delete Selected</option>
               </select>
@@ -355,7 +350,6 @@ const getStatusIcon = (status: User['status']) => {
                 <option value="admin">Administrator</option>
                 <option value="inspector">Inspector</option>
                 <option value="reviewer">Reviewer</option>
-                <option value="viewer">Viewer</option>
               </select>
               <select 
                 className="border border-gray-300 rounded-lg px-3 py-3 focus:ring-2 focus:ring-[#CD202C] focus:border-transparent text-gray-700"
@@ -365,8 +359,6 @@ const getStatusIcon = (status: User['status']) => {
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="pending">Pending</option>
-                <option value="suspended">Suspended</option>
               </select>
             </div>
           </div>
@@ -431,7 +423,6 @@ const getStatusIcon = (status: User['status']) => {
                         {user.role === 'admin' && <Shield className="w-3 h-3" />}
                         {user.role === 'inspector' && <User className="w-3 h-3" />}
                         {user.role === 'reviewer' && <CheckCircle className="w-3 h-3" />}
-                        {user.role === 'viewer' && <Eye className="w-3 h-3" />}
                         {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </span>
                     </td>
@@ -451,24 +442,6 @@ const getStatusIcon = (status: User['status']) => {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleResetPassword(user.id)}
-                          className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
-                          title="Reset Password"
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleToggleStatus(user.id)}
-                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg"
-                          title={user.status === 'active' ? 'Deactivate' : 'Activate'}
-                        >
-                          {user.status === 'active' ? (
-                            <UserX className="w-4 h-4" />
-                          ) : (
-                            <UserCheck className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button 
                           onClick={() => {
                             setUserToDelete(user.id);
                             setShowDeleteConfirm(true);
@@ -479,9 +452,6 @@ const getStatusIcon = (status: User['status']) => {
                           <Trash2 className="w-4 h-4" />
                         </button>
                         <div className="relative">
-                          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
                         </div>
                       </div>
                     </td>
@@ -509,11 +479,14 @@ const getStatusIcon = (status: User['status']) => {
               </div>
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-gray-400"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg 
+                            text-gray-700 
+                            disabled:opacity-50 disabled:cursor-not-allowed 
+                            hover:border-gray-400"
                 >
-                  Previous
+                Previous
                 </button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
@@ -530,22 +503,25 @@ const getStatusIcon = (status: User['status']) => {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1.5 border rounded-lg ${
+                        className={`px-3 py-1.5 border rounded-lg text-sm font-medium ${
                         currentPage === pageNum
-                          ? 'border-[#CD202C] bg-red-50 text-[#CD202C]'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                            ? 'border-[#CD202C] bg-red-50 text-[#CD202C]'
+                            : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                        }`}
                     >
                       {pageNum}
                     </button>
                   );
                 })}
                 <button 
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-gray-400"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg 
+                            text-gray-700 
+                            disabled:opacity-50 disabled:cursor-not-allowed 
+                            hover:border-gray-400"
                 >
-                  Next
+                Next
                 </button>
               </div>
             </div>
@@ -553,135 +529,120 @@ const getStatusIcon = (status: User['status']) => {
         </div>
       </div>
 
-      {/* User Modal */}
+        {/* User Modal */}
         {showUserModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
+            <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900">
                     {editingUser ? 'Edit User' : 'Add New User'}
-                  </h2>
-                  <button 
+                </h2>
+                <button 
                     onClick={() => {
-                      setShowUserModal(false);
-                      setEditingUser(null);
-                      userForm.reset();
+                    setShowUserModal(false);
+                    setEditingUser(null);
+                    userForm.reset();
                     }}
                     className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
+                >
                     <X className="w-5 h-5" />
-                  </button>
+                </button>
                 </div>
-              </div>
+            </div>
 
-              <form onSubmit={(e) => { e.preventDefault(); handleSaveUser(); }}>
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveUser(); }}>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                         Full Name *
-                      </label>
-                      <input
+                    </label>
+                    <input
                         type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent text-gray-900"
                         value={userForm.data.name}
                         onChange={(e) => userForm.setData('name', e.target.value)}
                         required
-                      />
-                      {userForm.errors.name && (
+                    />
+                    {userForm.errors.name && (
                         <p className="text-red-500 text-sm mt-1">{userForm.errors.name}</p>
-                      )}
+                    )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                         Email Address *
-                      </label>
-                      <input
+                    </label>
+                    <input
                         type="email"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent text-gray-900"
                         value={userForm.data.email}
                         onChange={(e) => userForm.setData('email', e.target.value)}
                         required
-                      />
-                      {userForm.errors.email && (
+                    />
+                    {userForm.errors.email && (
                         <p className="text-red-500 text-sm mt-1">{userForm.errors.email}</p>
-                      )}
+                    )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
-                        value={userForm.data.phone}
-                        onChange={(e) => userForm.setData('phone', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                         Role *
-                      </label>
-                      <select
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                    </label>
+                    <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent text-gray-900"
                         value={userForm.data.role}
                         onChange={(e) => userForm.setData('role', e.target.value as User['role'])}
                         required
-                      >
+                    >
                         <option value="admin">Administrator</option>
                         <option value="inspector">Inspector</option>
                         <option value="reviewer">Reviewer</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
+                    </select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                         Status *
-                      </label>
-                      <select
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent"
+                    </label>
+                    <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CD202C] focus:border-transparent text-gray-900"
                         value={userForm.data.status}
                         onChange={(e) => userForm.setData('status', e.target.value as User['status'])}
                         required
-                      >
+                    >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
-                        <option value="pending">Pending</option>
-                        <option value="suspended">Suspended</option>
-                      </select>
+                    </select>
                     </div>
-                  </div>
+                </div>
 
-                  <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end gap-3">
+                <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end gap-3">
                     <button
-                      type="button"
-                      onClick={() => {
+                    type="button"
+                    onClick={() => {
                         setShowUserModal(false);
                         setEditingUser(null);
                         userForm.reset();
-                      }}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-900"
                     >
-                      Cancel
+                    Cancel
                     </button>
                     <button
-                      type="submit"
-                      disabled={userForm.processing}
-                      className="px-4 py-2 bg-[#CD202C] text-white rounded-lg hover:bg-[#B81C26] flex items-center gap-2 disabled:opacity-50"
+                    type="submit"
+                    disabled={userForm.processing}
+                    className="px-4 py-2 bg-[#CD202C] text-white rounded-lg hover:bg-[#B81C26] flex items-center gap-2 disabled:opacity-50"
                     >
-                      <Save className="w-4 h-4" />
-                      {userForm.processing ? 'Saving...' : 'Save User'}
+                    <Save className="w-4 h-4" />
+                    {userForm.processing ? 'Saving...' : 'Save User'}
                     </button>
-                  </div>
                 </div>
-              </form>
+                </div>
+            </form>
             </div>
-          </div>
+        </div>
         )}
 
       {/* Delete Confirmation Modal */}
@@ -704,7 +665,7 @@ const getStatusIcon = (status: User['status']) => {
                     setShowDeleteConfirm(false);
                     setUserToDelete(null);
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-900"
                 >
                   Cancel
                 </button>
