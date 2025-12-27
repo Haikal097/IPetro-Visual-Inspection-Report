@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import React, { useState, useEffect} from 'react';
 
 import { FilePond, registerPlugin } from 'react-filepond';
@@ -30,6 +30,20 @@ export default function Index() {
     const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
     const [editedImage, setEditedImage] = useState<any>(null);
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
+    const params = new URLSearchParams(window.location.search);
+    const isPicker = params.get("picker") === "1";
+    const pickerItemId = params.get("itemId");
+    const pickerReturn = params.get("return");
+
+    const returnToReport = (url: string) => {
+    if (!isPicker || !pickerItemId || !pickerReturn) return;
+
+    router.get(pickerReturn, {
+        itemId: pickerItemId,
+        image: normalizeUrl(url),
+        }, { replace: true });
+    };
+
 
     const token = document
         .querySelector('meta[name="csrf-token"]')
@@ -38,9 +52,31 @@ export default function Index() {
     const headers = token ? { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' } : { 'Accept': 'application/json' };
 
     const openImgEditor = (imageUrl: string) => {
-        setUploadedImageUrl(imageUrl);
-        setIsImgEditorShown(true);
+    const fixed = normalizeUrl(imageUrl);
+    setUploadedImageUrl(fixed);
+    setIsImgEditorShown(true);
     };
+
+    const normalizeUrl = (u: string) => {
+  if (!u) return u;
+
+  try {
+    const url = new URL(u, window.location.origin);
+
+    // If backend returns localhost but you browse with 127.0.0.1:8000, fix it
+    if (url.hostname === "localhost" && window.location.hostname === "127.0.0.1") {
+      url.hostname = "127.0.0.1";
+      url.port = window.location.port; // keep 8000
+    }
+
+    return url.toString();
+  } catch {
+    // if it is already relative like /storage/...
+    return u;
+  }
+    };
+
+
 
     const closeImgEditor = () => {
         setIsImgEditorShown(false);
@@ -57,7 +93,12 @@ export default function Index() {
             const response = JSON.parse(file.serverId);
             if (response.success && response.url) {
                 console.log('Upload successful, opening editor:', response.url);
-                openImgEditor(response.url);
+                if (isPicker) {
+                    openImgEditor(response.url);  // upload then edit
+                    } else {
+                    fetchPhotos(); // just refresh gallery
+                }
+
             }
         } catch (e) {
             console.error('Error parsing server response:', e);
@@ -98,32 +139,49 @@ export default function Index() {
     };
 
     const handleImageSave = async (editedImageObject: any, designState: any) => {
-        console.log('Image saved:', editedImageObject);
-        setEditedImage(editedImageObject);
-        
-        try {
-            // Save to server
-            const result = await saveEditedImageToServer(
-                editedImageObject.imageBase64, 
-                `edited-${Date.now()}.png`
-            );
-            
-            alert('Image saved successfully! URL: ' + result.url);
-            
-        } catch (error) {
-            alert('Failed to save image to server. Downloading locally instead.');
-            
-            // Fallback: download locally
-            const downloadLink = document.createElement('a');
-            downloadLink.href = editedImageObject.imageBase64;
-            downloadLink.download = `edited-${Date.now()}.png`;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
+    console.log("Image saved:", editedImageObject);
+    setEditedImage(editedImageObject);
+
+    let result: any = null;
+
+    try {
+        // Save to server
+        result = await saveEditedImageToServer(
+        editedImageObject.imageBase64,
+        `edited-${Date.now()}.png`
+        );
+
+        // Save URL for preview
+        if (result?.success && result?.url) {
+        setSavedImageUrl(result.url);
+
+        // ✅ If opened from report, return the edited image to report
+        if (isPicker && pickerItemId && pickerReturn) {
+            returnToReport(result.url);
+            closeImgEditor();
+            return;
         }
-        
-        closeImgEditor();
+
+        alert("Image saved successfully! URL: " + result.url);
+        } else {
+        throw new Error(result?.message || "Save failed");
+        }
+    } catch (error) {
+        console.error("Failed to save edited image:", error);
+        alert("Failed to save image to server. Downloading locally instead.");
+
+        // Fallback: download locally
+        const downloadLink = document.createElement("a");
+        downloadLink.href = editedImageObject.imageBase64;
+        downloadLink.download = `edited-${Date.now()}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+    }
+
+    closeImgEditor();
     };
+
 
     const [photos, setPhotos] = useState<Array<{
         name: string;
@@ -306,22 +364,59 @@ export default function Index() {
                     
                     {/* Photo Gallery */}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-8">
-                        {photos.map((photo) => (
+                        {photos.map((photo) => {
+                            const fixedUrl = normalizeUrl(photo.url);
+
+                            return (
                             <div key={photo.path} className="relative group">
-                                <img 
-                                    src={photo.url}
-                                    alt={photo.name}
-                                    className="w-full h-48 object-cover rounded-lg cursor-pointer"
-                                    onClick={() => openImgEditor(photo.url)}
+                                <img
+                                src={fixedUrl}
+                                alt={photo.name}
+                                className="w-full h-48 object-cover rounded-lg"
                                 />
+
+                                {/* Overlay actions */}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 p-2">
+                                {isPicker ? (
+                                    <>
+                                    <button
+                                        type="button"
+                                        onClick={() => returnToReport(fixedUrl)}
+                                        className="px-3 py-1 rounded bg-white text-black text-xs font-semibold"
+                                    >
+                                        Use
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => openImgEditor(fixedUrl)}
+                                        className="px-3 py-1 rounded bg-[#CD202C] text-white text-xs font-semibold"
+                                    >
+                                        Edit
+                                    </button>
+                                    </>
+                                ) : (
+                                    <button
+                                    type="button"
+                                    onClick={() => openImgEditor(fixedUrl)}
+                                    className="px-3 py-1 rounded bg-white text-black text-xs font-semibold"
+                                    >
+                                    Edit
+                                    </button>
+                                )}
+                                </div>
+
                                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <p className="text-sm truncate">{photo.name}</p>
+                                <p className="text-sm truncate">{photo.name}</p>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
+
                 </div>
             </div>
         </AppLayout>
     );
+
+
 }   

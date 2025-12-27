@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/layouts/app-layout";
-import { Head } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
 import ipetroLogo from '@/assets/logo.png';
+
 
 type ItemId = number;
 
@@ -270,12 +271,34 @@ export default function PhotoReport() {
     saveData({ ...data, items: data.items.filter((i) => i.id !== id) });
   };
 
+  useEffect(() => {
+  if (!data) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const itemId = params.get("itemId");
+  const image = params.get("image");
+
+  if (!itemId || !image) return;
+
+  const id = Number(itemId);
+  const nextItems = data.items.map((it) => (it.id === id ? { ...it, image } : it));
+  saveData({ ...data, items: nextItems });
+
+  // Clean the URL so refresh doesn't re-apply
+  params.delete("itemId");
+  params.delete("image");
+  const clean = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+  window.history.replaceState({}, "", clean);
+}, [data]);
+
+
   const handleEditImage = (id: ItemId) => {
-    // This keeps your original behavior: jump to index.html (photo editor)
-    // If your editor is inside your Inertia app, change this URL to your Inertia route.
-    localStorage.setItem(ACTIVE_ITEM_KEY, String(id));
-    window.location.href = "index.html";
-  };
+  router.get("/photo", {
+    picker: 1,
+    itemId: id,
+    return: "/reports/photo-report",
+  });
+};
 
   const handleReset = () => {
     if (!window.confirm("Create new report? All current data will be lost.")) return;
