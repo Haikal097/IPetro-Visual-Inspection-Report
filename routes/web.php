@@ -11,6 +11,8 @@ use App\Http\Controllers\InspectionCalendarController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SignatureController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\AlbumController;
+
 
 
 Route::get('/', function () {
@@ -29,7 +31,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage'])->name('save.edited.image');
     Route::delete('/upload', [PhotoController::class, 'destroy'])->name('upload.destroy');
     Route::get('/photos/temp/{filename}', [PhotoController::class, 'getTempUrl'])->name('photos.temp-url');
-    Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
+       Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
+    Route::put('/photos/{photo}', [PhotoController::class, 'update']); // move/rename
+    
+    Route::delete('/photos/{photo}', [PhotoController::class, 'destroy']);
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
     Route::get('/report', function () {
         return inertia('Reports/IndexInspector');
@@ -82,6 +87,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
         Route::post('/users/bulk-actions', [UserController::class, 'bulkActions'])->name('admin.users.bulkActions');
     });
+
+    // Album Management
+    Route::get('/albums', [AlbumController::class, 'index']);
+    Route::post('/albums', [AlbumController::class, 'store']);
+    Route::put('/albums/{album}', [AlbumController::class, 'update']);
+    Route::delete('/albums/{album}', [AlbumController::class, 'destroy']);
+
+
+    //Save edited image
+    Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage']);
 
 });
 

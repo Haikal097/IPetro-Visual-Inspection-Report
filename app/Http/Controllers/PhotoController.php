@@ -5,150 +5,263 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Photo;
+use App\Models\Album;
 
 class PhotoController extends Controller
 {
+    /**
+     * Photos page
+     */
     public function index()
     {
-        return Inertia::render('Photos/Index',[]);
+        return Inertia::render('Photos/Index');
     }
 
+    /**
+     * Upload new photo (store file + DB record)
+     * POST /upload
+     */
     public function store(Request $request)
     {
         $request->validate([
-            'file' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+            'file'     => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+            'album_id' => 'nullable|integer',
         ]);
 
+        $userId = $request->user()->id;
+
+        // ✅ if album_id provided, confirm album belongs to user
+        $albumId = $request->input('album_id');
+        if ($albumId) {
+            $exists = Album::where('id', $albumId)->where('user_id', $userId)->exists();
+            if (!$exists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid album.',
+                ], 422);
+            }
+        } else {
+            $albumId = null;
+        }
+
         try {
-            $path = $request->file('file')->store('photos', 'public');
-            $url = Storage::disk('public')->url($path);
+            $file = $request->file('file');
+            $path = $file->store('photos', 'public');
+
+            $photo = Photo::create([
+                'user_id'  => $userId,
+                'album_id' => $albumId,
+                'name'     => $file->getClientOriginalName(),
+                'path'     => $path,
+                'size'     => $file->getSize() ?? 0,
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'File uploaded successfully!',
-                'path' => $path,
-                'url' => $url,
+                'photo'   => $photo,
+                'path'    => $photo->path,
+                'url'     => $photo->url,
             ], 200);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Upload failed: ' . $e->getMessage()
+                'message' => 'Upload failed: ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    // New method to save edited images
+    /**
+     * Save edited image (base64 → file + DB record)
+     * POST /save-edited-image
+     */
     public function saveEditedImage(Request $request)
     {
         $request->validate([
-            'image' => 'required|string',
+            'image'    => 'required|string',
             'filename' => 'required|string',
+            'album_id' => 'nullable|integer',
         ]);
+
+        $userId = $request->user()->id;
+
+        // ✅ validate album belongs to user if provided
+        $albumId = $request->input('album_id');
+        if ($albumId) {
+            $exists = Album::where('id', $albumId)->where('user_id', $userId)->exists();
+            if (!$exists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid album.',
+                ], 422);
+            }
+        } else {
+            $albumId = null;
+        }
 
         try {
             $imageData = $request->input('image');
-            
-            // Extract base64 data and get extension
-            $extension = '.png'; // default extension
+
+            // detect extension
+            $extension = 'png';
             if (preg_match('/^data:image\/(\w+);base64,/', $imageData, $matches)) {
+                $extension = $matches[1];
                 $imageData = substr($imageData, strpos($imageData, ',') + 1);
-                $extension = '.' . $matches[1];
             }
 
-            $imageData = base64_decode($imageData);
-
-            if ($imageData === false) {
+            $binary = base64_decode($imageData);
+            if ($binary === false) {
                 throw new \Exception('Invalid base64 image data');
             }
 
-            $originalName = pathinfo($request->input('filename'), PATHINFO_FILENAME);
-            $filename = 'edited_' . time() . '_' . $originalName . $extension;
+            $filename = 'edited_' . time() . '.' . $extension;
             $path = 'photos/edited/' . $filename;
 
-            // Save to cloud storage (persistent)
-            Storage::disk('public')->put($path, $imageData, 'public');
-            $url = Storage::disk('public')->url($path);
+            Storage::disk('public')->put($path, $binary);
+
+            $photo = Photo::create([
+                'user_id'  => $userId,
+                'album_id' => $albumId,
+                'name'     => $filename,
+                'path'     => $path,
+                'size'     => strlen($binary),
+            ]);
 
             return response()->json([
-                'success' => true,
-                'message' => 'Edited image saved successfully!',
-                'path' => $path,
-                'url' => $url,
+                'success'  => true,
+                'message'  => 'Edited image saved successfully!',
+                'photo'    => $photo,
+                'path'     => $photo->path,
+                'url'      => $photo->url,
                 'filename' => $filename,
             ], 200);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to save edited image: ' . $e->getMessage()
+                'message' => 'Failed to save edited image: ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    public function destroy(Request $request)
+    /**
+     * ✅ List all photos + albums (filters + sort + search)
+     * GET /photos/all?album_id=null|{id}&sort=created_at|name|size&dir=asc|desc&q=
+     */
+    public function getAllPhotos(Request $request)
     {
-        try {
-            $filePath = $request->getContent();
-            
-            if (str_contains($filePath, 'storage/')) {
-                $filePath = str_replace('/storage/', '', $filePath);
+        $userId = $request->user()->id;
+
+        // albums for folder dropdown
+        $albums = Album::where('user_id', $userId)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $query = Photo::where('user_id', $userId);
+
+        // album filter
+        if ($request->has('album_id')) {
+            if ($request->album_id === 'null') {
+                $query->whereNull('album_id');
+            } else if ($request->album_id !== '') {
+                $query->where('album_id', (int) $request->album_id);
             }
-
-            if (Storage::disk('public')->exists($filePath)) {
-                Storage::disk('public')->delete($filePath);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'File deleted successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Delete failed: ' . $e->getMessage()
-            ], 500);
         }
+
+        // search by name
+        if ($request->filled('q')) {
+            $q = $request->q;
+            $query->where('name', 'like', "%{$q}%");
+        }
+
+        // sort
+        $sort = $request->get('sort', 'created_at');
+        $dir  = $request->get('dir', 'desc');
+
+        if (!in_array($sort, ['created_at', 'name', 'size'], true)) $sort = 'created_at';
+        if (!in_array($dir, ['asc', 'desc'], true)) $dir = 'desc';
+
+        $photos = $query->orderBy($sort, $dir)->get();
+
+        return response()->json([
+            'success' => true,
+            'albums'  => $albums,
+            'photos'  => $photos,
+        ]);
     }
 
-    public function getTempUrl($filename)
+    /**
+     * Move / rename photo
+     * PUT /photos/{photo}
+     */
+    public function update(Request $request, Photo $photo)
     {
-        $path = "photos/{$filename}";
-        if (Storage::disk('public')->exists($path)) {
-            $url = Storage::disk('public')->url($path);
-            return response()->json(['url' => $url]);
-        }
-        
-        return response()->json(['error' => 'File not found'], 404);
-    }
+        $userId = $request->user()->id;
+        abort_unless($photo->user_id === $userId, 403);
 
-    public function getAllPhotos()
-    {
-        try {
-            $files = Storage::disk('public')->files('photos');
-            
-            $photos = [];
-            foreach ($files as $file) {
-                if (in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                    $photos[] = [
-                        'name' => basename($file),
-                        'path' => $file,
-                        'url' => Storage::disk('public')->url($file),
-                        'size' => Storage::disk('public')->size($file),
-                        'last_modified' => Storage::disk('public')->lastModified($file),
-                    ];
+        $request->validate([
+            'name'     => 'nullable|string|max:120',
+            'album_id' => 'nullable|integer',
+        ]);
+
+        // rename
+        if ($request->has('name')) {
+            $photo->name = $request->name;
+        }
+
+        // move folder (album_id can be null = unsorted)
+        if ($request->has('album_id')) {
+            $albumId = $request->input('album_id');
+
+            if ($albumId) {
+                // ✅ ensure album belongs to user
+                $exists = Album::where('id', $albumId)->where('user_id', $userId)->exists();
+                if (!$exists) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid album.',
+                    ], 422);
                 }
+                $photo->album_id = $albumId;
+            } else {
+                $photo->album_id = null; // unsorted
             }
+        }
+
+        $photo->save();
+
+        return response()->json([
+            'success' => true,
+            'photo'   => $photo,
+        ]);
+    }
+
+    /**
+     * Delete photo (file + DB)
+     * DELETE /photos/{photo}
+     */
+    public function destroy(Request $request, Photo $photo)
+    {
+        $userId = $request->user()->id;
+        abort_unless($photo->user_id === $userId, 403);
+
+        try {
+            if ($photo->path && Storage::disk('public')->exists($photo->path)) {
+                Storage::disk('public')->delete($photo->path);
+            }
+
+            $photo->delete();
 
             return response()->json([
                 'success' => true,
-                'photos' => $photos
+                'message' => 'Photo deleted successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch photos: ' . $e->getMessage()
+                'message' => 'Delete failed: ' . $e->getMessage(),
             ], 500);
         }
     }
