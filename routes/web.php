@@ -5,14 +5,10 @@ use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 use App\Http\Controllers\PhotoController;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\InspectionCalendarController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SignatureController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\AlbumController;
-
 
 
 Route::get('/', function () {
@@ -22,37 +18,38 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function () {
+
+    Route::get('/dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
-    Route::get( '/photo',[PhotoController::class, 'index'])->name('photo.index');
+    /**
+     * Photos
+     */
+    Route::get('/photo', [PhotoController::class, 'index'])->name('photo.index');
     Route::post('/upload', [PhotoController::class, 'store'])->name('upload');
     Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage'])->name('save.edited.image');
     Route::delete('/upload', [PhotoController::class, 'destroy'])->name('upload.destroy');
     Route::get('/photos/temp/{filename}', [PhotoController::class, 'getTempUrl'])->name('photos.temp-url');
-       Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
-    Route::put('/photos/{photo}', [PhotoController::class, 'update']); // move/rename
-    
-    Route::delete('/photos/{photo}', [PhotoController::class, 'destroy']);
+    Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
+
     Route::get('/report', function () {
         return inertia('Reports/IndexInspector');
-    });
+    })->name('report.index');
+
     Route::get('/pv-report', function () {
         return Inertia::render('Reports/PVReport');
-    });
+    })->name('reports.pv');
 
-    // Inspection Calendar routes
+<<<<<<< HEAD
     Route::get('/inspection-calendar', [InspectionCalendarController::class, 'index'])->name('inspection.calendar');
     Route::get('/inspection-calendar/events', [InspectionCalendarController::class, 'events'])->name('inspection.calendar.events');
 
-    // CRUD routes for inspections
     Route::post('/inspection-calendar', [InspectionCalendarController::class, 'store'])->name('inspection.calendar.store');
     Route::put('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'update'])->name('inspection.calendar.update');
     Route::delete('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'destroy'])->name('inspection.calendar.destroy');
 
-    // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
@@ -61,7 +58,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications/stats', [NotificationController::class, 'stats'])->name('notifications.stats');
 
 
-    // Calendar page
     Route::get('/calendar', function () {
     return Inertia::render('calendar/InspectionCalendar');
     })->name('calendar');
@@ -71,11 +67,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Profile/Signature');
     })->name('profile.signature');
 
-    // Save signature
     Route::post('/profile/signature', [SignatureController::class, 'store'])
         ->name('profile.signature.store');
 
-    // Example: finalize/sign report route
+    /**
+     * Report finalize, download, verify
+     */
     Route::post('/reports/{report}/finalize', [ReportController::class, 'finalize'])
         ->name('reports.finalize');
 
@@ -85,33 +82,79 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/verify/{token}', [ReportController::class, 'verify'])
         ->name('reports.verify');
 
-    // User Management
-    Route::prefix('admin')->middleware(['role:admin'])->group(function () {
-        Route::get('/users', [UserController::class, 'index'])->name('admin.users.index');
-        Route::post('/users', [UserController::class, 'store'])->name('admin.users.store');
-        Route::put('/users/{user}', [UserController::class, 'update'])->name('admin.users.update');
-        Route::patch('/users/{user}/status', [UserController::class, 'updateStatus'])->name('admin.users.updateStatus');
-        Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('admin.users.resetPassword');
-        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
-        Route::post('/users/bulk-actions', [UserController::class, 'bulkActions'])->name('admin.users.bulkActions');
-    });
-
-    // Album Management
-    Route::get('/albums', [AlbumController::class, 'index']);
-    Route::post('/albums', [AlbumController::class, 'store']);
-    Route::put('/albums/{album}', [AlbumController::class, 'update']);
-    Route::delete('/albums/{album}', [AlbumController::class, 'destroy']);
 
 
-    //Save edited image
-    Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage']);
-
-
+=======
+Route::get('/admin', function () {
+    return inertia('Admin/Index', [
+        'users' => [
+            // Make sure this array exists
+            [
+                'id' => 1,
+                'name' => 'Test User',
+                'email' => 'test@ipetro.com',
+                'role' => 'admin',
+                'status' => 'active',
+                'lastLogin' => 'Today'
+            ]
+        ],
+        'stats' => [
+            'totalUsers' => 1,
+            'activeUsers' => 1,
+            'newUsers' => 0,
+            'pendingUsers' => 0
+        ]
+    ]);
 });
+Route::get('/admin/users', function () {
+    $users = [
+        [
+            'id' => 1,
+            'name' => 'John Anderson',
+            'email' => 'john.anderson@ipetro.com',
+            'phone' => '+1 (555) 123-4567',
+            'role' => 'admin',
+            'status' => 'active',
+            'lastLogin' => 'Today, 9:42 AM',
+            'createdAt' => '2024-01-15',
+            'lastActive' => '2 minutes ago',
+            'avatarColor' => '#CD202C'
+        ],
+        [
+            'id' => 2,
+            'name' => 'Sarah Johnson',
+            'email' => 'sarah.johnson@ipetro.com',
+            'phone' => '+1 (555) 987-6543',
+            'role' => 'inspector',
+            'status' => 'active',
+            'lastLogin' => 'Yesterday, 3:20 PM',
+            'createdAt' => '2024-01-10',
+            'lastActive' => '1 hour ago',
+            'avatarColor' => '#1e40af'
+        ],
+        // Add more users...
+    ];
 
+    return inertia('Admin/Users', [
+        'users' => $users,
+        'totalUsers' => count($users),
+        'activeUsers' => 2,
+        'newUsersThisMonth' => 1,
+        'inactiveUsers' => 0
+    ]);
+})->name('admin.users');
+>>>>>>> 7167f63fd90d435b375b78b00f14d2d702e51120
+
+
+/**
+ * Photo report page (outside verified, but still needs auth)
+ */
 Route::get('/reports/photo-report', function () {
     return inertia('Reports/PhotoReport');
 })->middleware(['auth']);
+
+
+
 
 Route::prefix('api')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('reports', ReportController::class);
@@ -137,4 +180,4 @@ Route::post('/notifications/test', function () {
 
 
 
-require __DIR__.'/settings.php';
+require __DIR__ . '/settings.php';
