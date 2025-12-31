@@ -43,17 +43,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Reports/PVReport');
     });
 
+    // Inspection Calendar routes
     Route::get('/inspection-calendar', [InspectionCalendarController::class, 'index'])->name('inspection.calendar');
     Route::get('/inspection-calendar/events', [InspectionCalendarController::class, 'events'])->name('inspection.calendar.events');
 
+    // CRUD routes for inspections
     Route::post('/inspection-calendar', [InspectionCalendarController::class, 'store'])->name('inspection.calendar.store');
     Route::put('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'update'])->name('inspection.calendar.update');
     Route::delete('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'destroy'])->name('inspection.calendar.destroy');
 
+    // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
+    Route::get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
+    Route::post('/notifications/test', [NotificationController::class, 'sendTest'])->middleware(['auth'])->name('notifications.test');
+    Route::get('/notifications/stats', [NotificationController::class, 'stats'])->name('notifications.stats');
 
+
+    // Calendar page
     Route::get('/calendar', function () {
     return Inertia::render('calendar/InspectionCalendar');
     })->name('calendar');
@@ -98,6 +106,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //Save edited image
     Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage']);
 
+
 });
 
 Route::get('/reports/photo-report', function () {
@@ -109,6 +118,23 @@ Route::prefix('api')->middleware('auth:sanctum')->group(function () {
     Route::post('/reports/{id}/submit', [ReportController::class, 'submit']);
     Route::post('/reports/{id}/approve', [ReportController::class, 'approve']);
 });
+
+//Send Test Reminder Notification
+Route::post('/notifications/test', function () {
+    $user = auth()->user();
+
+    $user->notify(new \App\Notifications\InspectionReminderNotification([
+        'type' => 'test_reminder',
+        'inspection_id' => null,
+        'title' => 'TEST REMINDER: This is a test notification',
+        'start_at' => now()->toDateTimeString(),
+        'tag' => 'TEST',
+        'location' => 'Local',
+    ]));
+
+    return response()->json(['ok' => true]);
+})->middleware(['auth']);
+
 
 
 require __DIR__.'/settings.php';

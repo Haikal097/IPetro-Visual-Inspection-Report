@@ -2,10 +2,12 @@
 
 namespace App\Notifications;
 
+
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+
 
 class InspectionReminderNotification extends Notification
 {
@@ -15,7 +17,7 @@ class InspectionReminderNotification extends Notification
 
     public function via($notifiable): array
     {
-        return ['database', 'mail']; // remove 'mail' if you don’t want email
+        return ['database']; // remove 'mail' if you don’t want email
     }
 
     public function toDatabase($notifiable): array

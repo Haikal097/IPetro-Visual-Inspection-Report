@@ -3,22 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Inspection extends Model
 {
     protected $fillable = [
-        'user_id','title','tag','location','notes',
-        'start_at','end_at','status',
-        'remind_1d','remind_1h','reminded_1d_at','reminded_1h_at'
+        'title','description','start_at','end_at','location','status','user_id'
     ];
 
     protected $casts = [
         'start_at' => 'datetime',
-        'end_at' => 'datetime',
-        'remind_1d' => 'boolean',
-        'remind_1h' => 'boolean',
-        'reminded_1d_at' => 'datetime',
-        'reminded_1h_at' => 'datetime',
+        'end_at'   => 'datetime',
     ];
-    
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }
