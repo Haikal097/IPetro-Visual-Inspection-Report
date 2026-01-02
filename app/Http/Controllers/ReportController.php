@@ -16,25 +16,30 @@ class ReportController extends Controller
         return Inertia::render('Reports/Create'); // Make sure this path matches your React component
     }
     
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'json_data.reportNo' => 'required|string|max:100',
-            'json_data.equipmentTag' => 'required|string|max:100',
-            'json_data.equipmentType' => 'required|string|max:100',
-            'json_data.plantUnitArea' => 'required|string|max:200',
-            'json_data.doshRegistration' => 'nullable|string|max:100', // Changed to nullable
-            'json_data.reportDate' => 'required|date',
-            'status' => 'required|in:draft,submitted',
-        ]);
-        
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
+public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'json_data.reportNo' => 'required|string|max:100',
+        'json_data.equipmentTag' => 'required|string|max:100',
+        'json_data.equipmentType' => 'required|string|max:100',
+        'json_data.plantUnitArea' => 'required|string|max:200',
+        'json_data.doshRegistration' => 'nullable|string|max:100',
+        'json_data.reportDate' => 'required|date',
+        'status' => 'required|in:draft,submitted',
+    ]);
+    
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()
+        ], 422);
+    }
 
+    // Start database transaction
+    \DB::beginTransaction();
+    
+    try {
+        // 1. Create main report in reports table
         $report = Report::create([
             'title' => $request->title,
             'creator_id' => Auth::id(),
@@ -43,12 +48,37 @@ class ReportController extends Controller
             'submission_date' => $request->status === 'submitted' ? now() : null,
         ]);
         
+        // 2. Create photo report with ONLY report_id (all other fields NULL)
+        \DB::table('photo_reports')->insert([
+            'report_id' => $report->report_id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        
+        // Get the ID of the newly created photo report
+        $photoReportId = \DB::getPdo()->lastInsertId();
+        
+        \DB::commit();
+        
         return response()->json([
             'success' => true,
             'message' => 'Report saved successfully',
-            'data' => $report
+            'data' => [
+                'report' => $report,
+                'photo_report_id' => $photoReportId,
+            ]
         ], 201);
+        
+    } catch (\Exception $e) {
+        \DB::rollBack();
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to save report: ' . $e->getMessage(),
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
     
     public function update(Request $request, $id)
     {

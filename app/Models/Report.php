@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Report extends Model
@@ -261,6 +262,30 @@ class Report extends Model
     public function inspector()
     {
         return $this->belongsTo(\App\Models\User::class, 'inspector_id');
+    }
+
+        /**
+     * Get the photo report associated with this report
+     */
+    public function photoReport(): HasOne
+    {
+        return $this->hasOne(PhotoReport::class, 'report_id', 'report_id');
+    }
+
+    /**
+     * Check if report has a photo report
+     */
+    public function getHasPhotoReportAttribute(): bool
+    {
+        return $this->photoReport()->exists();
+    }
+
+    /**
+     * Get the photo report ID
+     */
+    public function getPhotoReportIdAttribute()
+    {
+        return $this->photoReport ? $this->photoReport->id : null;
     }
 
 

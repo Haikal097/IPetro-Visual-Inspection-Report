@@ -68,6 +68,8 @@ interface TemplateInfo {
 export default function PVReport() {
     const [form, setForm] = useState<FormState>(getInitialFormState());
     const page = usePage().props as any;
+    const { props } = usePage();
+    const initialReportId = props.reportId;
 
     const user = page.auth?.user;
 
@@ -248,7 +250,100 @@ const ready = Object.values(checklist).every(Boolean);
         return () => clearTimeout(saveTimeout);
     }, [form]);
 
-    
+    useEffect(() => {
+        if (initialReportId) {
+            loadReportData(initialReportId);
+        }
+    }, [initialReportId]);
+
+    const loadReportData = async (id: string | number) => {
+        try {
+            setIsSaving(true);
+            console.log('Loading report with ID:', id);
+            const response = await api.get(`/reports/${id}`);
+            
+            console.log('GET Response:', response.data); // DEBUG
+            
+            if (response.data.success) {
+                const responseData = response.data;
+                
+                // Extract ID from multiple possible locations
+                let extractedId = null;
+                
+                // Check your GET response structure
+                if (responseData.data && responseData.data.id) {
+                    extractedId = responseData.data.id;
+                    console.log('Found ID at response.data.data.id:', extractedId);
+                }
+                else if (responseData.data && responseData.data.report_id) {
+                    extractedId = responseData.data.report_id;
+                    console.log('Found ID at response.data.data.report_id:', extractedId);
+                }
+                else if (responseData.data && responseData.data.report && responseData.data.report.report_id) {
+                    extractedId = responseData.data.report.report_id;
+                    console.log('Found ID at response.data.data.report.report_id:', extractedId);
+                }
+                else if (responseData.id) {
+                    extractedId = responseData.id;
+                    console.log('Found ID at response.data.id:', extractedId);
+                }
+                
+                if (extractedId) {
+                    setReportId(extractedId);
+                    console.log('Set reportId to:', extractedId);
+                } else {
+                    // Fallback to the ID from URL
+                    setReportId(Number(id));
+                    console.log('Using URL ID as fallback:', id);
+                }
+                
+                // Get the json_data - check multiple locations
+                const jsonData = 
+                    responseData.data?.json_data || 
+                    responseData.data?.report?.json_data || 
+                    responseData.json_data || 
+                    {};
+                
+                console.log('Loaded json_data:', jsonData);
+                
+                // Populate form with existing data
+                setForm({
+                    title: jsonData.title || '',
+                    equipmentTag: jsonData.equipmentTag || '',
+                    equipmentDescription: jsonData.equipmentDescription || '',
+                    equipmentType: jsonData.equipmentType || '',
+                    plantUnitArea: jsonData.plantUnitArea || '',
+                    doshRegistration: jsonData.doshRegistration || '',
+                    reportNo: jsonData.reportNo || '',
+                    reportDate: jsonData.reportDate || '',
+                    initialFinding: jsonData.initialFinding || '',
+                    externalFinding: jsonData.externalFinding || '',
+                    internalFinding: jsonData.internalFinding || '',
+                    ndt: jsonData.ndt || '',
+                    recommendations: jsonData.recommendations || '',
+                    inspectorName: jsonData.inspectorName || page.auth?.user?.name || '',
+                    publishDate: jsonData.publishDate || jsonData.reportDate || new Date().toISOString().split("T")[0],
+                });
+                
+                // Also load from localStorage to merge any local changes
+                const stored = localStorage.getItem("ipetro_pv_report");
+                if (stored) {
+                    try {
+                        const storedData = JSON.parse(stored);
+                        // Merge stored data (prefer user's recent edits)
+                        setForm(prev => ({ ...prev, ...storedData }));
+                    } catch (e) {
+                        console.error("Failed to merge stored data");
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load report:', error);
+            toast.error('Failed to load report data. Starting new report.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     // Handle form changes
     const handleChange = (field: keyof FormState) => 
@@ -312,7 +407,7 @@ const ready = Object.values(checklist).every(Boolean);
     };
 
     // Handle save to database
-    const handleSave = async (status: 'draft' | 'submitted' = 'draft') => {
+    const handleSave = async (status: 'draft' | 'submitted' = 'draft', redirectAfterSave = false) => {
         setIsSaving(true);
         
         try {
@@ -320,7 +415,7 @@ const ready = Object.values(checklist).every(Boolean);
             if (!form.equipmentTag || !form.equipmentType || !form.reportNo) {
                 toast.error('Please complete all required fields');
                 setIsSaving(false);
-                return;
+                return { success: false, reportId: null };
             }
 
             // Auto-generate title if empty
@@ -329,12 +424,11 @@ const ready = Object.values(checklist).every(Boolean);
                 title = generateAutoTitle(form);
             }
 
-            // Prepare the data to match your reports table structure
+            // Prepare the data
             const reportData = {
-                // Store in database column AND json_data
-                title: title, // Store in title column
+                title: title,
                 json_data: {
-                    title: title, // Also store in json_data for backup
+                    title: title,
                     equipmentTag: form.equipmentTag,
                     equipmentDescription: form.equipmentDescription,
                     equipmentType: form.equipmentType,
@@ -347,8 +441,9 @@ const ready = Object.values(checklist).every(Boolean);
                     internalFinding: form.internalFinding,
                     ndt: form.ndt,
                     recommendations: form.recommendations,
+                    inspectorName: form.inspectorName,
+                    publishDate: form.publishDate,
                 },
-                // Fields that go directly into table columns
                 report_no: form.reportNo,
                 status: status,
             };
@@ -356,21 +451,87 @@ const ready = Object.values(checklist).every(Boolean);
             console.log('Sending report data:', reportData);
 
             let response;
+            let savedReportId = reportId;
             
-            if (reportId) {
+            if (savedReportId) {
                 // Update existing report
-                response = await api.put(`/reports/${reportId}`, reportData);
+                response = await api.put(`/reports/${savedReportId}`, reportData);
+                console.log('Updated existing report:', savedReportId);
             } else {
                 // Create new report
+                console.log('Creating new report...');
                 response = await api.post('/reports', reportData);
-                setReportId(response.data.data.id);
+                
+                // ✅ DEBUG: Log everything
+                console.log('🔍 Full POST Response:', response);
+                console.log('🔍 Response data:', response.data);
+                console.log('🔍 Response data structure:', {
+                    hasSuccess: 'success' in response.data,
+                    hasData: 'data' in response.data,
+                    hasReportInData: response.data.data && 'report' in response.data.data,
+                    reportKeys: response.data.data?.report ? Object.keys(response.data.data.report) : 'no report'
+                });
+                
+                // ✅ FIXED: Extract ID based on YOUR ACTUAL API RESPONSE STRUCTURE
+                // Your structure: { success: true, message: "...", data: { report: { report_id: 67, ... } } }
+                const responseData = response.data;
+                let extractedId = null;
+                
+                // Pattern 1: Check YOUR actual structure first
+                if (responseData.data && responseData.data.report && responseData.data.report.report_id) {
+                    extractedId = responseData.data.report.report_id;
+                    console.log('✅ Found ID at response.data.data.report.report_id:', extractedId);
+                }
+                // Pattern 2: Check if report has 'id' field instead of 'report_id'
+                else if (responseData.data && responseData.data.report && responseData.data.report.id) {
+                    extractedId = responseData.data.report.id;
+                    console.log('✅ Found ID at response.data.data.report.id:', extractedId);
+                }
+                // Pattern 3: Maybe the report is directly in data
+                else if (responseData.data && responseData.data.report_id) {
+                    extractedId = responseData.data.report_id;
+                    console.log('✅ Found ID at response.data.report_id:', extractedId);
+                }
+                // Pattern 4: Maybe it's at root level
+                else if (responseData.report_id) {
+                    extractedId = responseData.report_id;
+                    console.log('✅ Found ID at response.data.report_id:', extractedId);
+                }
+                // Pattern 5: Direct ID field
+                else if (responseData.id) {
+                    extractedId = responseData.id;
+                    console.log('✅ Found ID at response.data.id:', extractedId);
+                }
+                // Pattern 6: Check data.id
+                else if (responseData.data && responseData.data.id) {
+                    extractedId = responseData.data.id;
+                    console.log('✅ Found ID at response.data.data.id:', extractedId);
+                }
+                
+                savedReportId = extractedId;
+                console.log('🎯 Final savedReportId:', savedReportId);
+                
+                if (savedReportId) {
+                    setReportId(savedReportId);
+                    console.log('✅ Updated reportId state to:', savedReportId);
+                } else {
+                    console.warn('⚠️ No ID found in POST response. Full response:');
+                    console.log('Full response structure:', JSON.stringify(responseData, null, 2));
+                }
             }
 
-            if (response.data.success) {
-                // Also save to localStorage as backup
+            // ✅ FIXED: Check if successful - YOUR API returns success: true
+            const isSuccess = 
+                response.data.success === true || 
+                response.status === 200 || 
+                response.status === 201;
+
+            if (isSuccess) {
+                // Save to localStorage
                 localStorage.setItem("ipetro_pv_report", JSON.stringify(form));
                 
-                toast.success(`Report ${status === 'draft' ? 'saved' : 'submitted'} successfully!`, {
+                const successMessage = status === 'draft' ? 'saved' : 'submitted';
+                toast.success(`Report ${successMessage} successfully!`, {
                     icon: status === 'draft' ? '💾' : '📤',
                     duration: 3000,
                 });
@@ -378,10 +539,20 @@ const ready = Object.values(checklist).every(Boolean);
                 if (status === 'submitted') {
                     // Clear local storage after submission
                     localStorage.removeItem("ipetro_pv_report");
-                    // Optionally reset form
                     setForm(getInitialFormState());
                     setReportId(null);
                 }
+                
+                // Handle redirect
+                if (redirectAfterSave && savedReportId) {
+                    console.log('Will redirect to /pv-report/' + savedReportId);
+                    // Don't redirect here, let the caller handle it
+                }
+                
+                return { success: true, reportId: savedReportId };
+            } else {
+                console.error('API did not indicate success:', response.data);
+                return { success: false, reportId: null };
             }
         } catch (error: any) {
             console.error('Save error:', error);
@@ -396,9 +567,36 @@ const ready = Object.values(checklist).every(Boolean);
             } else {
                 toast.error('Failed to save report. Please try again.');
             }
+            
+            return { success: false, reportId: null };
         } finally {
             setIsSaving(false);
             if (status === 'submitted') setIsSubmitting(false);
+        }
+    };
+
+    const handleOpenPhotoReport = async () => {
+        console.log('=== handleOpenPhotoReport ===');
+        
+        // If we already have a reportId, use it
+        if (reportId) {
+            console.log('Using existing reportId:', reportId);
+            router.visit(`/reports/photo-report?report_id=${reportId}`);
+            return;
+        }
+        
+        // Otherwise save and get new ID
+        const result = await handleSave('draft');
+        console.log('Save result:', result);
+        
+        if (result.success && result.reportId) {
+            console.log('✅ Navigate to photo report with ID:', result.reportId);
+            setTimeout(() => {
+                router.visit(`/reports/photo-report?report_id=${result.reportId}`);
+            }, 500);
+        } else {
+            console.error('Failed to save or get ID:', result);
+            toast.error('Please save the report first using "Save Draft"');
         }
     };
 
@@ -1255,26 +1453,62 @@ const generateAutoTitle = (formData: FormState): string => {
                                             // Last section (Preview) - Show completion options
                                             <div className="flex gap-2">
                                                 <button
-                                                    onClick={() => {
-                                                        handleSave();
-                                                        toast.success('Report saved as draft!', {
-                                                            icon: '💾',
-                                                            duration: 3000,
-                                                        });
+                                                    onClick={async () => {
+                                                        const result = await handleSave('draft', true); // ← Add true for redirect
+                                                        console.log('Save result:', result);
+                                                        
+                                                        if (result.success && result.reportId) {
+                                                            console.log('Redirecting to /pv-report/' + result.reportId);
+                                                            // Redirect to the new report URL
+                                                            setTimeout(() => {
+                                                                router.visit(`/pv-report/${result.reportId}`);
+                                                            }, 1000);
+                                                        } else if (result.success) {
+                                                            toast.success('Report saved!', { icon: '💾' });
+                                                        }
                                                     }}
-                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors flex items-center gap-2"
+                                                    disabled={isSaving}
+                                                    className={`px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors flex items-center gap-2 ${
+                                                        isSaving ? 'opacity-50 cursor-not-allowed' : ''
+                                                    }`}
                                                 >
-                                                    <Save className="h-4 w-4" />
-                                                    Save Draft
+                                                    {isSaving ? (
+                                                        <>
+                                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            Saving...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Save className="h-4 w-4" />
+                                                            {reportId ? 'Update Draft' : 'Save Draft'}
+                                                        </>
+                                                    )}
                                                 </button>
+                                                
                                                 <button
-                                                    onClick={() => {
-                                                        router.visit('/reports/photo-report');
-                                                    }}
-                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors flex items-center gap-2"
+                                                    onClick={handleOpenPhotoReport}
+                                                    disabled={isSaving}
+                                                    className={`px-4 py-2 text-sm font-medium bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-colors flex items-center gap-2 ${
+                                                        isSaving ? 'opacity-50 cursor-not-allowed' : ''
+                                                    }`}
                                                 >
-                                                    <Check className="h-4 w-4" />
-                                                    Open Photo Report
+                                                    {isSaving ? (
+                                                        <>
+                                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            Saving...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Check className="h-4 w-4" />
+                                                            Open Photo Report
+                                                        </>
+                                                    )}
                                                 </button>
                                             </div>
                                         ) : (
