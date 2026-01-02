@@ -12,6 +12,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SignatureController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AlbumController;
+use App\Http\Controllers\Api\PhotoReportController;
 
 
 
@@ -104,26 +105,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/albums', [AlbumController::class, 'store']);
     Route::put('/albums/{album}', [AlbumController::class, 'update']);
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy']);
+    
+    Route::get('/reports/{reportId}/photo-report', [PhotoReportController::class, 'getPhotoReport'])
+        ->name('reports.photo-report.get');
 
+    Route::post('/reports/{reportId}/photo-report', [PhotoReportController::class, 'savePhotoReport'])
+        ->name('reports.photo-report.save');
 
-    //Save edited image
-    Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage']);
+    Route::put('/reports/{reportId}/photo-report', [PhotoReportController::class, 'savePhotoReport'])
+        ->name('reports.photo-report.update');
+
+    Route::delete('/reports/{reportId}/photo-report', [PhotoReportController::class, 'deletePhotoReport'])
+        ->name('reports.photo-report.delete');
+
+   Route::get('/reports/photo-report', function () {
+        return inertia('Reports/PhotoReport', [
+            'reportId' => request()->query('report_id'),
+        ]);
+    });
 
 });
 
-Route::get('/reports/photo-report', function () {
-    return inertia('Reports/PhotoReport', [
-        'reportId' => request()->query('report_id'),
-    ]);
-})->middleware(['auth']);
+Route::prefix('api')->middleware(['auth'])->group(function () {
+    Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/reports/{report}', [ReportController::class, 'show']);
+    Route::put('/reports/{report}', [ReportController::class, 'update']);
+    Route::delete('/reports/{report}', [ReportController::class, 'destroy']);
 
-Route::prefix('api')->middleware('auth:sanctum')->group(function () {
-    Route::apiResource('reports', ReportController::class);
     Route::post('/reports/{id}/submit', [ReportController::class, 'submit']);
     Route::post('/reports/{id}/approve', [ReportController::class, 'approve']);
-
-    Route::get('/reports/{id}/photo-report', [ReportController::class, 'getPhotoReport']);
 });
-
 
 require __DIR__.'/settings.php';

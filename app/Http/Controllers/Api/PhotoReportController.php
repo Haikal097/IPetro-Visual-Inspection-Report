@@ -256,37 +256,21 @@ class PhotoReportController extends Controller
      * 
      * @return \Illuminate\Http\JsonResponse
      */
-    public function index()
+    public function index(Request $request)
     {
-        try {
-            Log::info('Fetching all photo reports');
-            
-            // Uncomment if you have authentication
-            // $user = Auth::user();
-            
-            // Get reports that have photo reports
-            $photoReports = PhotoReport::with('report')
-                // ->whereHas('report', function ($query) use ($user) {
-                //     $query->where('creator_id', $user->id);
-                // })
-                ->orderBy('updated_at', 'desc')
-                ->paginate(10);
-            
-            Log::info('Found ' . $photoReports->total() . ' photo reports');
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Photo reports retrieved successfully',
-                'data' => $photoReports,
-            ], 200);
-            
-        } catch (\Exception $e) {
-            Log::error('Error fetching photo reports: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch photo reports',
-                'error' => $e->getMessage(),
-            ], 500);
+        $query = PhotoReport::query();
+        
+        if ($request->has('report_id')) {
+            $query->where('report_id', $request->report_id);
         }
+        
+        $photoReports = $query->get();
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'photo_reports' => $photoReports
+            ]
+        ]);
     }
 }
