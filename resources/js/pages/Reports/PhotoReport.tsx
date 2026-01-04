@@ -504,22 +504,37 @@ export default function PhotoReport() {
     if (!itemId || !image) return;
 
     const id = Number(itemId);
-    const nextItems = data.items.map((it) => (it.id === id ? { ...it, image } : it));
-    saveData({ ...data, items: nextItems });
 
+    const nextItems = data.items.map((it) =>
+      it.id === id ? { ...it, image } : it
+    );
+
+    const nextData = { ...data, items: nextItems };
+    setData(nextData);
+
+    // ✅ save immediately (so image goes into DB)
+    if (reportId) {
+      saveToBackend(nextData, photoReportId || undefined);
+    }
+
+    // ✅ clean URL
     params.delete("itemId");
     params.delete("image");
     const clean = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
     window.history.replaceState({}, "", clean);
-  }, [data]);
+  }, [data, reportId, photoReportId]);
 
   const handleEditImage = (id: ItemId) => {
+    const params = new URLSearchParams(window.location.search);
+    const rid = params.get("report_id"); // keep current report_id
+
     router.get("/photo", {
       picker: 1,
       itemId: id,
-      return: "/reports/photo-report",
+      return: rid ? `/reports/photo-report?report_id=${rid}` : "/reports/photo-report",
     });
   };
+
 
   const handleReset = () => {
     if (!window.confirm("Create new report? All current data will be lost.")) return;
