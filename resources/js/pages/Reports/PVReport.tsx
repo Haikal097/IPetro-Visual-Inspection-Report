@@ -130,6 +130,9 @@ const ready = Object.values(checklist).every(Boolean);
 
     const printRef = useRef<HTMLDivElement>(null);
 
+    const [aiLoading, setAiLoading] = useState(false);//ai
+    const [aiError, setAiError] = useState<string | null>(null);//ai
+
     // In your React component (PVReport.tsx)
     const api = axios.create({
         baseURL: '/api', // Use relative path
@@ -380,6 +383,77 @@ const ready = Object.values(checklist).every(Boolean);
             });
         }
     };
+
+
+    //Handle Ai
+    const handleGenerateAI = async () => {
+    setAiLoading(true);
+    setAiError(null);
+
+    try {
+        const payload = {
+        report_id: reportId, // ✅ link to the report
+        equipmentTag: form.equipmentTag,
+        equipmentType: form.equipmentType,
+        plantUnitArea: form.plantUnitArea,
+        doshRegistration: form.doshRegistration,
+        reportNo: form.reportNo,
+        reportDate: form.reportDate,
+        initialFinding: form.initialFinding,
+        externalFinding: form.externalFinding,
+        internalFinding: form.internalFinding,
+        ndt: form.ndt,
+        recommendations: form.recommendations,
+        };
+
+        const csrf = document
+        .querySelector('meta[name="csrf-token"]')
+        ?.getAttribute("content");
+
+        axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
+        if (csrf) axios.defaults.headers.common["X-CSRF-TOKEN"] = csrf;
+        axios.defaults.withCredentials = true;
+
+        // ✅ FIX: correct endpoint
+        const res = await axios.post("/api/ai/pv-report-draft", payload);
+
+        console.log("Saved AI draft id:", res.data.draft_id);
+
+        if (!res.data.ok) {
+        setAiError(res.data.error || "Failed to generate AI draft.");
+        toast.error(res.data.error || "AI draft failed");
+        return;
+        }
+
+        const d = res.data.draft || {};
+        const ok = confirm(
+        "Apply AI improvements? This will replace the text in those sections."
+        );
+        if (!ok) return;
+
+        setForm((prev) => ({
+        ...prev,
+        initialFinding: d.initialFinding ?? prev.initialFinding,
+        externalFinding: d.externalFinding ?? prev.externalFinding,
+        internalFinding: d.internalFinding ?? prev.internalFinding,
+        ndt: d.ndt ?? prev.ndt,
+        recommendations: d.recommendations ?? prev.recommendations,
+        }));
+
+        toast.success("AI draft applied!", { icon: "🤖", duration: 2500 });
+    } catch (e: any) {
+        const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        "Server error generating AI draft.";
+        setAiError(msg);
+        toast.error(msg);
+    } finally {
+        setAiLoading(false);
+    }
+    };
+
+
 
     // Copy field content to clipboard
     const copyToClipboard = async (field: keyof FormState, label: string) => {
@@ -1415,6 +1489,8 @@ const generateAutoTitle = (formData: FormState): string => {
                                         form={form}
                                         handlePrint={handlePrint}
                                         signatureUrl={signatureUrl}
+                                        onGenerateAI={handleGenerateAI}
+                                        aiLoading={aiLoading}
                                         />
 
                                 </div>
@@ -1658,9 +1734,11 @@ interface PreviewSectionProps {
   form: FormState;
   handlePrint: () => void;
   signatureUrl: string | null; // ✅ add
+  onGenerateAI: () => void;//ai
+aiLoading: boolean;//ai
 }
 
-function PreviewSection({ form, handlePrint, signatureUrl }: PreviewSectionProps) {
+function PreviewSection({ form, handlePrint, signatureUrl, onGenerateAI, aiLoading }: PreviewSectionProps) {
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
@@ -1689,6 +1767,15 @@ function PreviewSection({ form, handlePrint, signatureUrl }: PreviewSectionProps
                         <Printer className="h-4 w-4" />
                         Print / PDF
                     </button>
+                
+                <button
+                        onClick={onGenerateAI}
+                        disabled={aiLoading}
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all disabled:opacity-60"
+                        >
+                        <span className="text-base">🤖</span>
+                        {aiLoading ? "Generating..." : "AI Improve Draft"}
+                        </button>
                 </div>
             </div>
 

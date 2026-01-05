@@ -15,6 +15,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\Api\PhotoReportController;
+use App\Http\Controllers\AiReportDraftController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -215,6 +216,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/albums', [AlbumController::class, 'store'])->name('albums.store');
     Route::put('/albums/{album}', [AlbumController::class, 'update'])->name('albums.update');
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
+
 });
 
 /*
@@ -230,6 +232,15 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
 
     Route::post('/reports/{id}/submit', [ReportController::class, 'submit']);
     Route::post('/reports/{id}/approve', [ReportController::class, 'approve']);
+
+    //ai
+
+    Route::post('/ai/pv-report-draft', [AiReportDraftController::class, 'generatePv'])
+        ->middleware(['auth'])
+        ->name('ai.pv-report-draft.generate.web');
+
+
 });
+
 
 require __DIR__ . '/settings.php';
