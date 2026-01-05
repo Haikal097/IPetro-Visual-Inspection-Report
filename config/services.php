@@ -6,7 +6,8 @@ return [
     |--------------------------------------------------------------------------
     | Third Party Services
     |--------------------------------------------------------------------------
-    |
+    */
+    /*
     | This file is for storing the credentials for third party services such
     | as Mailgun, Postmark, AWS and more. This file provides the de facto
     | location for this type of information, allowing packages to have
@@ -34,5 +35,26 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+
+    // Generic LLM (your existing config)
+    'llm' => [
+        'endpoint' => env('LLM_ENDPOINT'),
+        'key'      => env('LLM_API_KEY'),
+        'model'    => env('LLM_MODEL', 'default'),
+    ],
+
+    // OpenAI (your existing config)
+    'openai' => [
+        'key'   => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+    ],
+
+    // ✅ ADD THIS (Gemini)
+    'gemini' => [
+        'key'   => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    ],
+
+    
 
 ];
