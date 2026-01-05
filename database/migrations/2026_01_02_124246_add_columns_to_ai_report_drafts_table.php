@@ -7,33 +7,36 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     public function up(): void
+        {
+            Schema::table('ai_report_drafts', function (Blueprint $table) {
+
+                // ✅ Add report_id because it DOES NOT exist yet
+                $table->unsignedBigInteger('report_id')->nullable()->after('user_id');
+
+                // Add new columns
+                $table->string('provider', 30)->default('gemini')->after('report_id');
+                $table->string('model', 80)->nullable()->after('provider');
+                $table->string('status', 30)->default('generated')->after('model');
+
+                $table->json('input_payload')->nullable()->after('status');
+                $table->json('output_draft')->nullable()->after('input_payload');
+
+                // Index
+                $table->index(['user_id', 'report_id']);
+            });
+        }
+
+
+        public function down(): void
     {
         Schema::table('ai_report_drafts', function (Blueprint $table) {
 
-            // ✅ report_id already exists, so DO NOT add it again.
+            // Drop index by name (safer)
+            $table->dropIndex('ai_report_drafts_user_id_report_id_index');
 
-            // Add new columns
-            $table->string('provider', 30)->default('gemini')->after('report_id');
-            $table->string('model', 80)->nullable()->after('provider');
-            $table->string('status', 30)->default('generated')->after('model');
-
-            $table->json('input_payload')->nullable()->after('status');
-            $table->json('output_draft')->nullable()->after('input_payload');
-
-            // Optional index
-            $table->index(['user_id', 'report_id']);
-        });
-    }
-
-    public function down(): void
-    {
-        Schema::table('ai_report_drafts', function (Blueprint $table) {
-
-            // Drop index first (if exists)
-            $table->dropIndex(['user_id', 'report_id']);
-
-            // Drop added columns only
+            // Drop columns
             $table->dropColumn([
+                'report_id',
                 'provider',
                 'model',
                 'status',
@@ -42,4 +45,5 @@ return new class extends Migration
             ]);
         });
     }
+
 };

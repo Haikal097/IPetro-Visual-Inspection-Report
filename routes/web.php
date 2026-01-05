@@ -101,9 +101,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Notifications
     |--------------------------------------------------------------------------
     */
-    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications', [NotificationController::class, 'feed'])
+        ->name('notifications.index');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
+    Route::get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
+    Route::get('/notifications/stats', [NotificationController::class, 'stats'])->name('notifications.stats');
+
+    // Keep this controller version (your earlier one)
+    Route::post('/notifications/test', [NotificationController::class, 'sendTest'])
+        ->middleware(['auth'])
+        ->name('notifications.test');
+
 
     /*
     |--------------------------------------------------------------------------
