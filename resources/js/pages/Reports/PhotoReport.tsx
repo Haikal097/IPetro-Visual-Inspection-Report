@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/layouts/app-layout";
 import { Head, router } from "@inertiajs/react";
 import ipetroLogo from '@/assets/logo.png';
-
+import axios from 'axios';
 
 type ItemId = number;
 
@@ -15,7 +15,7 @@ type ReportItem = {
   title: string;
   findings: string;
   requirements: string;
-  image: string | null; // base64/dataURL or url
+  image: string | null;
 };
 
 type ReportData = {
@@ -28,9 +28,6 @@ type ReportData = {
   plantUnit: string;
   items: ReportItem[];
 };
-
-const STORAGE_KEY = "ipetro_report_data";
-const ACTIVE_ITEM_KEY = "ipetro_active_item_id";
 
 const PRESETS: Record<PresetGroup, string[]> = {
   findings: [
@@ -64,15 +61,6 @@ function makeReportNumber(): string {
   return `RPT-${year}-${randomID}`;
 }
 
-function safeParse<T>(raw: string | null): T | null {
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
 function ensureShape(input: any): ReportData | null {
   if (!input || typeof input !== "object") return null;
   if (!Array.isArray(input.items)) return null;
@@ -97,7 +85,6 @@ function ensureShape(input: any): ReportData | null {
   };
 }
 
-
 function autoGrowOneLine(el: HTMLTextAreaElement | null) {
   if (!el) return;
   el.style.height = "auto";
@@ -108,10 +95,7 @@ function autoGrow(el: HTMLTextAreaElement | null) {
   if (!el) return;
   el.style.height = "auto";
   el.style.height = `${el.scrollHeight}px`;
-
-
 }
-
 
 function ExpandableInput(props: {
   value: string;
@@ -154,14 +138,14 @@ function ExpandableInput(props: {
   );
 }
 
-
 export default function PhotoReport() {
   const [data, setData] = useState<ReportData | null>(null);
   const [logoError, setLogoError] = useState(false);
-
-
-  // Tailwind styles from your HTML <style> converted to inline class names + small CSS injection
-  // (You can move this CSS into your global app.css if you prefer.)
+  const [reportId, setReportId] = useState<number | null>(null);
+  const [photoReportId, setPhotoReportId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
   useEffect(() => {
     const styleId = "ipetro-photo-report-css";
     if (document.getElementById(styleId)) return;
@@ -199,44 +183,283 @@ export default function PhotoReport() {
     document.head.appendChild(css);
   }, []);
 
-  // Initialize/load from localStorage
-  useEffect(() => {
-    const saved = safeParse<ReportData>(localStorage.getItem(STORAGE_KEY));
-    const restored = ensureShape(saved);
-
-    if (restored) {
-      setData(restored);
+  const handleGenerateJSON = () => {
+    if (!data) {
+      alert("No data available to generate JSON file.");
       return;
     }
 
-    const initData: ReportData = {
-      reportTitle: "VISUAL INTERNAL INSPECTION",
-      reportNumber: makeReportNumber(),
-      inspectionDate: todayISO(),
-      pmt: "",
-      tag: "",
-      description: "",
-      plantUnit: "",
-      items: [
-        {
-          id: 1,
-          title: "General View of Equipment",
-          findings: "General View of Equipment.",
-          requirements: "Visual Inspection\nNil.",
-          image: null,
-        },
-        { id: 2, title: "", findings: "", requirements: "", image: null },
-      ],
+    const jsonData = {
+      photoReportId: photoReportId,
+      mainReportId: reportId,
+      generatedAt: new Date().toISOString(),
+      data: data,
+      metadata: {
+        version: "1.0",
+        generator: "iPETRO Photo Report Generator",
+        relationship: "photo_report.report_id (foreign key) references report.id (primary key)"
+      }
     };
 
-    setData(initData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initData));
+    const jsonString = JSON.stringify(jsonData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const fileName = `photo-report-${data.reportNumber || 'unnamed'}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log("JSON file generated:", fileName);
+  };
+
+  // Initialize/load from backend only
+  useEffect(() => {
+    const loadReportData = async () => {
+      setIsLoading(true);
+      
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const urlReportId = searchParams.get('report_id');
+        
+        console.log('📥 Main Report ID from URL:', urlReportId);
+        
+        if (!urlReportId) {
+          alert('❌ No report ID provided. Please access this page with a valid report_id.');
+          setIsLoading(false);
+          return;
+        }
+        
+        const mainReportId = Number(urlReportId);
+        setReportId(mainReportId);
+        
+        try {
+          // Fetch main report data for reference
+          let mainReportData = null;
+          try {
+            const mainReportResponse = await axios.get(`/reports/${mainReportId}`);
+            if (mainReportResponse.data.success) {
+              mainReportData = mainReportResponse.data.data;
+              console.log('📋 Main report data:', mainReportData);
+            }
+          } catch (mainReportError) {
+            console.log('Main report not found or error:', mainReportError);
+          }
+          
+          // Fetch photo report using the correct endpoint
+          try {
+            const response = await axios.get(`/reports/${mainReportId}/photo-report`);
+            console.log('📦 Photo report response:', response.data);
+            
+            if (response.data.success) {
+              let photoReport = null;
+              
+              if (response.data.data?.photo_report) {
+                photoReport = response.data.data.photo_report;
+              } else if (response.data.data) {
+                const data = response.data.data;
+                if (data.id && data.report_id) {
+                  photoReport = data;
+                }
+              }
+              
+              if (photoReport) {
+                console.log('✅ Found photo report:', photoReport);
+                
+                // Store the photo_report_id
+                setPhotoReportId(photoReport.id);
+                
+                // Check if photo report has data in report_data field
+                if (photoReport.report_data) {
+                  const restored = ensureShape(photoReport.report_data);
+                  if (restored) {
+                    setData(restored);
+                    setIsLoading(false);
+                    alert(`✅ Loaded photo report from database (ID: ${photoReport.id})`);
+                    return;
+                  }
+                }
+                
+                // If report_data is empty but other fields exist, populate the form
+                const initData: ReportData = {
+                  reportTitle: photoReport.report_title || 
+                            mainReportData?.title || 
+                            "VISUAL INTERNAL INSPECTION",
+                  reportNumber: photoReport.report_number || 
+                              mainReportData?.reportNo || 
+                              makeReportNumber(),
+                  inspectionDate: photoReport.inspection_date || 
+                                mainReportData?.reportDate || 
+                                todayISO(),
+                  pmt: photoReport.pmt || 
+                      mainReportData?.equipmentType || 
+                      "",
+                  tag: photoReport.tag || 
+                      mainReportData?.equipmentTag || 
+                      "",
+                  description: photoReport.description || 
+                              mainReportData?.equipmentDescription || 
+                              "",
+                  plantUnit: photoReport.plant_unit || 
+                            mainReportData?.plantUnitArea || 
+                            "",
+                  items: [
+                    {
+                      id: 1,
+                      title: "General View of Equipment",
+                      findings: "General View of Equipment.",
+                      requirements: "Visual Inspection\nNil.",
+                      image: null,
+                    },
+                    { id: 2, title: "", findings: "", requirements: "", image: null },
+                  ],
+                };
+                
+                setData(initData);
+                
+                alert(`📝 Created new photo report template from database record (ID: ${photoReport.id})`);
+                
+                // Save the populated data back to the database
+                saveToBackend(initData, photoReport.id);
+                
+                setIsLoading(false);
+                return;
+              }
+            }
+          } catch (photoReportError: any) {
+            console.log('Error fetching photo report:', photoReportError.message);
+            
+            // If 404, create a new photo report
+            if (photoReportError.response?.status === 404) {
+              console.log('🆕 No photo report exists yet. Creating new one...');
+              
+              const initData: ReportData = {
+                reportTitle: mainReportData?.title || "VISUAL INTERNAL INSPECTION",
+                reportNumber: mainReportData?.reportNo || makeReportNumber(),
+                inspectionDate: mainReportData?.reportDate || todayISO(),
+                pmt: mainReportData?.equipmentType || "",
+                tag: mainReportData?.equipmentTag || "",
+                description: mainReportData?.equipmentDescription || "",
+                plantUnit: mainReportData?.plantUnitArea || "",
+                items: [
+                  {
+                    id: 1,
+                    title: "General View of Equipment",
+                    findings: "General View of Equipment.",
+                    requirements: "Visual Inspection\nNil.",
+                    image: null,
+                  },
+                  { id: 2, title: "", findings: "", requirements: "", image: null },
+                ],
+              };
+              
+              setData(initData);
+              alert('🆕 Creating new photo report (none exists in database)');
+              
+              // Auto-save the new photo report
+              setTimeout(() => {
+                saveToBackend(initData);
+              }, 1000);
+              
+              setIsLoading(false);
+              return;
+            } else {
+              alert('❌ Failed to connect to database. Please check your connection.');
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Backend load failed:', error);
+          alert('❌ Failed to load data. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+        
+      } catch (error) {
+        console.error('Failed to load report:', error);
+        alert('❌ Error loading report data. Please refresh.');
+        setIsLoading(false);
+      }
+    };
+    
+    loadReportData();
   }, []);
 
-  const saveData = (next: ReportData) => {
-    setData(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  const saveData = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    return (next: ReportData) => {
+      setData(next);
+      
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (reportId) {
+          saveToBackend(next, photoReportId || undefined);
+        }
+      }, 2000);
+    };
+  }, [reportId, photoReportId]);
+
+  const saveToBackend = async (
+    photoReportData: ReportData,
+    existingPhotoReportId?: number
+  ) => {
+    if (!reportId) return;
+
+    setIsSaving(true);
+
+    try {
+      const savePayload = {
+        report_data: photoReportData,
+        report_title: photoReportData.reportTitle,
+        report_number: photoReportData.reportNumber,
+        inspection_date: photoReportData.inspectionDate,
+        pmt: photoReportData.pmt,
+        tag: photoReportData.tag,
+        description: photoReportData.description,
+        plant_unit: photoReportData.plantUnit,
+      };
+
+      // ✅ If already exists -> PUT, else -> POST
+      const response = existingPhotoReportId
+        ? await axios.put(`/reports/${reportId}/photo-report`, savePayload)
+        : await axios.post(`/reports/${reportId}/photo-report`, savePayload);
+
+      console.log("✅ Save response:", response.data);
+
+      // ✅ capture photo report id from backend if provided
+      const returned =
+        response.data?.data?.photo_report ||
+        response.data?.data ||
+        response.data?.photo_report ||
+        null;
+
+      const newId = returned?.id ?? returned?.photo_report_id ?? null;
+
+      if (newId) {
+        setPhotoReportId(Number(newId));
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error("❌ Save failed:", err.response?.data || err.message);
+      alert("❌ Failed to save photo report. Check console/network.");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleSaveToDB = async () => {
+    if (!data) return;
+    const ok = await saveToBackend(data, photoReportId || undefined);
+    if (ok) alert("✅ Photo report saved to database!");
+  };
+
 
   const handleHeaderChange = (field: keyof Omit<ReportData, "items">, value: string) => {
     if (!data) return;
@@ -272,47 +495,66 @@ export default function PhotoReport() {
   };
 
   useEffect(() => {
-  if (!data) return;
+    if (!data) return;
 
-  const params = new URLSearchParams(window.location.search);
-  const itemId = params.get("itemId");
-  const image = params.get("image");
+    const params = new URLSearchParams(window.location.search);
+    const itemId = params.get("itemId");
+    const image = params.get("image");
 
-  if (!itemId || !image) return;
+    if (!itemId || !image) return;
 
-  const id = Number(itemId);
-  const nextItems = data.items.map((it) => (it.id === id ? { ...it, image } : it));
-  saveData({ ...data, items: nextItems });
+    const id = Number(itemId);
 
-  // Clean the URL so refresh doesn't re-apply
-  params.delete("itemId");
-  params.delete("image");
-  const clean = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-  window.history.replaceState({}, "", clean);
-}, [data]);
+    const nextItems = data.items.map((it) =>
+      it.id === id ? { ...it, image } : it
+    );
 
+    const nextData = { ...data, items: nextItems };
+    setData(nextData);
+
+    // ✅ save immediately (so image goes into DB)
+    if (reportId) {
+      saveToBackend(nextData, photoReportId || undefined);
+    }
+
+    // ✅ clean URL
+    params.delete("itemId");
+    params.delete("image");
+    const clean = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+    window.history.replaceState({}, "", clean);
+  }, [data, reportId, photoReportId]);
 
   const handleEditImage = (id: ItemId) => {
-  router.get("/photo", {
-    picker: 1,
-    itemId: id,
-    return: "/reports/photo-report",
-  });
-};
+    const params = new URLSearchParams(window.location.search);
+    const rid = params.get("report_id"); // keep current report_id
+
+    router.get("/photo", {
+      picker: 1,
+      itemId: id,
+      return: rid ? `/reports/photo-report?report_id=${rid}` : "/reports/photo-report",
+    });
+  };
+
 
   const handleReset = () => {
     if (!window.confirm("Create new report? All current data will be lost.")) return;
-    localStorage.removeItem(STORAGE_KEY);
+    setReportId(null);
+    setPhotoReportId(null);
+    
+    const url = new URL(window.location.href);
+    url.searchParams.delete('report_id');
+    window.history.replaceState({}, '', url.toString());
+    
     window.location.reload();
   };
 
   const handlePrint = () => window.print();
 
-  if (!data) {
+  if (isLoading || !data) {
     return (
       <AppLayout breadcrumbs={[{ title: "Photo Report", href: "/reports/photo-report" }]}>
         <Head title="Photo Report" />
-        <div className="p-10 text-center text-gray-500">Initializing Report Template...</div>
+        <div className="p-10 text-center text-gray-500">Loading report data...</div>
       </AppLayout>
     );
   }
@@ -321,56 +563,78 @@ export default function PhotoReport() {
     <AppLayout breadcrumbs={[{ title: "Photo Report", href: "/reports/photo-report" }]}>
       <Head title="Photo Report" />
 
-      {/* Global nav similar to report.html */}
-      {/* <div className="no-print w-full bg-gray-900 text-white px-4 py-2 flex justify-between items-center text-xs sm:text-sm">
-        <span className="font-semibold tracking-wide">iPETRO Inspection Tools</span>
-        <div className="space-x-2">
-          <a
-            href="index.html"
-            className="inline-block px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
-          >
-            Photo Editor
-          </a>
-          <a
-            href="pv-report.html"
-            className="inline-block px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
-          >
-            PV Report Template
-          </a>
-          <span className="inline-block px-3 py-1 rounded bg-[rgba(205,32,44,0.95)]">
-            Photo Report
-          </span>
-        </div>
-      </div> */}
-
       <div className="bg-gray-100">
         <div className="max-w-[210mm] mx-auto p-8 bg-white shadow-lg my-4 min-h-screen">
-            {/* ===== TOP CONTROLS (like screenshot) ===== */}
+            {/* ===== TOP CONTROLS ===== */}
             <div className="no-print mb-10 flex items-center justify-between">
-            <button
-                onClick={handleReset}
-                className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline"
-                type="button"
-            >
-                Start New Report
-            </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleReset}
+                  className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline"
+                  type="button"
+                >
+                  Start New Report
+                </button>
+                
+                <button
+                  onClick={handleGenerateJSON}
+                  className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-green-700"
+                  type="button"
+                  title="Download JSON file of the current report data"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Generate JSON
+                </button>
+              </div>
 
-            <button
+              {/* Show IDs if available */}
+              <div className="text-sm text-gray-600 space-x-4">
+                {reportId && (
+                  <span>PV Report ID: <span className="font-mono font-bold">{reportId}</span></span>
+                )}
+                {photoReportId && (
+                  <span>Photo Report ID: <span className="font-mono font-bold">{photoReportId}</span></span>
+                )}
+                {isSaving && (
+                  <span className="text-amber-600">
+                    <span className="animate-pulse">●</span> Saving...
+                  </span>
+                )}
+              </div>
+
+              <button
                 onClick={handlePrint}
                 type="button"
                 className="inline-flex items-center gap-2 rounded-md bg-[#77787B] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#545454]"
-            >
-                {/* Printer Icon */}
+              >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
+                  <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
                     d="M6 9V2h12v7M6 18H5a3 3 0 01-3-3v-4a3 3 0 013-3h14a3 3 0 013 3v4a3 3 0 01-3 3h-1M6 14h12v8H6v-8z"
-                />
+                  />
                 </svg>
                 Print / Save PDF
-            </button>
+              </button>
+              <button
+                onClick={handleSaveToDB}
+                disabled={isSaving}
+                className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white shadow ${
+                  isSaving ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+                type="button"
+                title="Save report into database"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M17 16v2a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2h8l4 4v4M9 13h6" />
+                </svg>
+
+                {photoReportId ? "Update to DB" : "Upload to DB"}
+              </button>
             </div>
 
             {/* ===== HEADER (logo + titles) ===== */}
@@ -400,7 +664,6 @@ export default function PhotoReport() {
                 </div>
             </div>
             </div>
-
 
           {/* Header Table */}
           <table className="report-table mb-6">
