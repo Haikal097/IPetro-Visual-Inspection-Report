@@ -9,6 +9,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\InspectionCalendarController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SignatureController;
+use App\Http\Controllers\ProfileController;
 
 
 Route::get('/', function () {
@@ -41,7 +42,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Reports/PVReport');
     });
 
-<<<<<<< HEAD
     Route::get('/inspection-calendar', [InspectionCalendarController::class, 'index'])->name('inspection.calendar');
     Route::get('/inspection-calendar/events', [InspectionCalendarController::class, 'events'])->name('inspection.calendar.events');
     Route::post('/inspection-calendar', [InspectionCalendarController::class, 'store'])->name('inspection.calendar.store');
@@ -93,66 +93,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
 
-=======
-Route::get('/admin', function () {
-    return inertia('Admin/Index', [
-        'users' => [
-            // Make sure this array exists
-            [
-                'id' => 1,
-                'name' => 'Test User',
-                'email' => 'test@ipetro.com',
-                'role' => 'admin',
-                'status' => 'active',
-                'lastLogin' => 'Today'
-            ]
-        ],
-        'stats' => [
-            'totalUsers' => 1,
-            'activeUsers' => 1,
-            'newUsers' => 0,
-            'pendingUsers' => 0
-        ]
-    ]);
-});
-Route::get('/admin/users', function () {
-    $users = [
-        [
-            'id' => 1,
-            'name' => 'John Anderson',
-            'email' => 'john.anderson@ipetro.com',
-            'phone' => '+1 (555) 123-4567',
-            'role' => 'admin',
-            'status' => 'active',
-            'lastLogin' => 'Today, 9:42 AM',
-            'createdAt' => '2024-01-15',
-            'lastActive' => '2 minutes ago',
-            'avatarColor' => '#CD202C'
-        ],
-        [
-            'id' => 2,
-            'name' => 'Sarah Johnson',
-            'email' => 'sarah.johnson@ipetro.com',
-            'phone' => '+1 (555) 987-6543',
-            'role' => 'inspector',
-            'status' => 'active',
-            'lastLogin' => 'Yesterday, 3:20 PM',
-            'createdAt' => '2024-01-10',
-            'lastActive' => '1 hour ago',
-            'avatarColor' => '#1e40af'
-        ],
-        // Add more users...
-    ];
-
-    return inertia('Admin/Users', [
-        'users' => $users,
-        'totalUsers' => count($users),
-        'activeUsers' => 2,
-        'newUsersThisMonth' => 1,
-        'inactiveUsers' => 0
-    ]);
-})->name('admin.users');
->>>>>>> 7167f63fd90d435b375b78b00f14d2d702e51120
 
     Route::get('/review', function () {
         return inertia('Reports/IndexReviewer');
