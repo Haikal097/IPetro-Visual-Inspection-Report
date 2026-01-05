@@ -124,6 +124,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     });
 
+    Route::get('/review', function () {
+        return inertia('Reports/IndexReviewer');
+    })->name('reports.reviewer');
+    
+    Route::get('/reviewer/report', function () {
+        return Inertia::render('Reviewer/Report');
+    })->name('reviewer.report');
 });
 
 Route::prefix('api')->middleware(['auth'])->group(function () {

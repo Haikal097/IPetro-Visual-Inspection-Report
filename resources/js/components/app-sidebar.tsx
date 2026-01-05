@@ -2,79 +2,85 @@ import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Image, FileText  } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { Folder, LayoutGrid, Image, FileText, Shield, Users } from 'lucide-react';
 import AppLogo from './app-logo';
+import { useEffect } from 'react';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Photos',
-        href: '/photo',
-        icon: Image,
-    },
-    {
-        title: 'Report',
-        href: '/report',
-        icon: FileText,
-    },
-    { 
-        title: "Calendar", 
-        href: "/calendar", 
-        icon: Folder,
-    },
+const inspectorNav: NavItem[] = [
+  { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+  { title: 'Photos', href: '/photo', icon: Image },
+  { title: 'Report', href: '/report', icon: FileText },
+  { title: 'Calendar', href: '/calendar', icon: Folder },
 ];
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
+const reviewerNav: NavItem[] = [
+  { title: 'Dashboard', href: '/review', icon: LayoutGrid },
+  { title: 'Reports', href: '/reviewer/report', icon: FileText },
 ];
+
+const adminNav: NavItem[] = [
+  { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+  { title: 'Users', href: '/admin/users', icon: Users },
+  { title: 'Reports', href: '/reports', icon: FileText },
+  { title: 'Photos', href: '/photo', icon: Image },
+  { title: 'Settings', href: '/admin/settings', icon: Folder },
+];
+
+const footerNavItems: NavItem[] = [];
+
+
 
 export function AppSidebar() {
-    return (
-        <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
-                                <AppLogo />
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarHeader>
+  const page = usePage();
 
-            <SidebarContent>
-                <NavMain items={mainNavItems} />
-            </SidebarContent>
+  // Your Inertia props show: auth.role = "admin"
+  const auth = (page.props as any)?.auth ?? {};
+  const roleRaw = auth?.role ?? auth?.user?.role ?? 'unknown';
+  const role = String(roleRaw).toLowerCase();
 
-            <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
-                <NavUser />
-            </SidebarFooter>
-        </Sidebar>
-    );
+  const isAdmin = role === 'admin';
+  const isReviewer = role === 'reviewer';
+  const isInspector = role === 'inspector';
+
+  const mainNavItems: NavItem[] = isAdmin
+    ? adminNav
+    : isReviewer
+    ? reviewerNav
+    : inspectorNav;
+
+  return (
+    <Sidebar collapsible="icon" variant="inset">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href={dashboard()} prefetch>
+                <AppLogo />
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <NavMain items={mainNavItems} />
+      </SidebarContent>
+
+      <SidebarFooter>
+        <NavFooter items={footerNavItems} className="mt-auto" />
+        <NavUser />
+      </SidebarFooter>
+    </Sidebar>
+  );
 }
