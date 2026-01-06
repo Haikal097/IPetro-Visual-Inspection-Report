@@ -45,6 +45,7 @@ export interface FormState {
 
     inspectorName: string;
     publishDate: string; // dd/mm/yyyy or yyyy-mm-dd (we’ll format)
+    equipmentTemplateId?: number | null;
 
 
 }
@@ -72,6 +73,8 @@ export default function PVReport() {
     const initialReportId = props.reportId;
 
     const user = page.auth?.user;
+
+    
 
     useEffect(() => {
     setForm((prev) => {
@@ -116,6 +119,18 @@ export default function PVReport() {
     signature: !!signatureUrl,
     };
 
+    type EquipmentTemplate = {
+    id: number;
+    equipment_type: string;
+    title: string | null;
+    initial_finding: string | null;
+    external_finding: string | null;
+    internal_finding: string | null;
+    ndt: string | null;
+    recommendations: string | null;
+    };
+
+
 // ✅ ready = all true
 const ready = Object.values(checklist).every(Boolean);
 
@@ -132,6 +147,10 @@ const ready = Object.values(checklist).every(Boolean);
 
     const [aiLoading, setAiLoading] = useState(false);//ai
     const [aiError, setAiError] = useState<string | null>(null);//ai
+
+    const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<number | "">("");
+
 
     // In your React component (PVReport.tsx)
     const api = axios.create({
@@ -258,6 +277,39 @@ const ready = Object.values(checklist).every(Boolean);
             loadReportData(initialReportId);
         }
     }, [initialReportId]);
+
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+            const res = await api.get("/equipment-templates");
+            if (res.data?.success) setTemplates(res.data.data || []);
+            } catch (e) {
+            console.error(e);
+            toast.error("Failed to load equipment templates");
+            }
+        };
+        fetchTemplates();
+        }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const templateIdStr = params.get("template_id");
+        if (!templateIdStr) return;
+
+        const templateId = Number(templateIdStr);
+        if (!templateId || templates.length === 0) return;
+
+        const t = templates.find((x) => x.id === templateId);
+        if (!t) return;
+
+        // Apply force (new report)
+        applyTemplateToForm(t, true);
+
+        // also set selected dropdown value
+        setSelectedTemplateId(templateId);
+        }, [templates]);
+
+
 
     const loadReportData = async (id: string | number) => {
         try {
@@ -501,6 +553,10 @@ const ready = Object.values(checklist).every(Boolean);
             // Prepare the data
             const reportData = {
                 title: title,
+
+                // ✅ DB column (new)
+                equipment_template_id: form.equipmentTemplateId ?? null,
+
                 json_data: {
                     title: title,
                     equipmentTag: form.equipmentTag,
@@ -517,10 +573,14 @@ const ready = Object.values(checklist).every(Boolean);
                     recommendations: form.recommendations,
                     inspectorName: form.inspectorName,
                     publishDate: form.publishDate,
+
+                    // ✅ OPTIONAL (keep inside json as well if you like)
+                    equipmentTemplateId: form.equipmentTemplateId ?? null,
                 },
+
                 report_no: form.reportNo,
                 status: status,
-            };
+                };
 
             console.log('Sending report data:', reportData);
 
@@ -647,6 +707,7 @@ const ready = Object.values(checklist).every(Boolean);
             setIsSaving(false);
             if (status === 'submitted') setIsSubmitting(false);
         }
+
     };
 
     const handleOpenPhotoReport = async () => {
@@ -673,6 +734,33 @@ const ready = Object.values(checklist).every(Boolean);
             toast.error('Please save the report first using "Save Draft"');
         }
     };
+
+
+    // Apply template to form
+    const applyTemplateToForm = (t: EquipmentTemplate, force = false) => {
+  setForm((prev) => {
+    const next = { ...prev };
+
+    // store the chosen template ID
+    next.equipmentTemplateId = t.id;
+    next.equipmentType = t.equipment_type;
+    next.equipmentDescription = t.title || t.equipment_type;
+
+    const canSet = (current: string) => force || !current?.trim();
+
+    if (canSet(next.initialFinding)) next.initialFinding = t.initial_finding || "";
+    if (canSet(next.externalFinding)) next.externalFinding = t.external_finding || "";
+    if (canSet(next.internalFinding)) next.internalFinding = t.internal_finding || "";
+    if (canSet(next.ndt)) next.ndt = t.ndt || "";
+    if (canSet(next.recommendations)) next.recommendations = t.recommendations || "";
+
+    return next;
+  });
+
+
+  toast.success(`Template applied: ${t.title || t.equipment_type}`, { icon: "✨" });
+    };
+
 
 // Helper function to generate title
 const generateAutoTitle = (formData: FormState): string => {
@@ -735,6 +823,8 @@ const generateAutoTitle = (formData: FormState): string => {
                 day: 'numeric'
             });
         };
+
+        
 
         // Generate the print HTML
         const printContent = `
@@ -1261,31 +1351,63 @@ const generateAutoTitle = (formData: FormState): string => {
                                     </div>
 
                                     <div className="space-y-6">
-                                        {/* Equipment Type Selection */}
+                                        {/* Equipment Template Selection */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                                                Equipment Type *
+                                            Equipment Template (auto-fill)
                                             </label>
-                                            <div className="relative">
-                                                <select
-                                                    value={form.equipmentType}
-                                                    onChange={handleEquipmentTypeChange}
-                                                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pl-12 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
-                                                >
-                                                    {EQUIPMENT_OPTIONS.map((option) => (
-                                                        <option key={option.value} value={option.value}>
-                                                            {option.icon} {option.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                                    <Settings className="h-5 w-5 text-gray-400" />
-                                                </div>
+
+                                            <div className="flex flex-col md:flex-row gap-2">
+                                            <select
+                                                value={selectedTemplateId ?? ""}
+                                                onChange={(e) => {
+                                                const val = e.target.value ? Number(e.target.value) : null;
+                                                setSelectedTemplateId(val);
+
+                                                if (!val) return;
+                                                const t = templates.find((x) => x.id === val);
+                                                if (!t) return;
+
+                                                const hasAnyText =
+                                                    !!form.initialFinding.trim() ||
+                                                    !!form.externalFinding.trim() ||
+                                                    !!form.internalFinding.trim() ||
+                                                    !!form.ndt.trim() ||
+                                                    !!form.recommendations.trim();
+
+                                                if (hasAnyText) {
+                                                    const ok = confirm(
+                                                    "Apply template now?\n\nOK = Replace existing section texts\nCancel = Only fill empty fields"
+                                                    );
+                                                    applyTemplateToForm(t, ok);
+                                                } else {
+                                                    applyTemplateToForm(t, true);
+                                                }
+                                                }}
+                                                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
+                                            >
+                                                <option value="">Select template...</option>
+                                                {templates.map((t) => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.equipment_type} - {t.title || "Untitled"}
+                                                </option>
+                                                ))}
+                                            </select>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => router.visit("/equipment-templates")}
+                                                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
+                                            >
+                                                Manage Templates
+                                            </button>
                                             </div>
+
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                                Select a template or choose "Custom / Manual" to enter details manually
+                                            Selecting a template can auto-fill Initial / External / Internal / NDT / Recommendations.
                                             </p>
                                         </div>
+
 
                                         {/* Equipment Details Grid */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -20,9 +20,20 @@ import { useEffect } from 'react';
 const inspectorNav: NavItem[] = [
   { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
   { title: 'Photos', href: '/photo', icon: Image },
-  { title: 'Report', href: '/report', icon: FileText },
+
+    {
+    title: 'Report',
+    href: '/reports', // ✅ must exist
+    icon: FileText,
+    children: [
+      { title: 'PV Report', href: '/pv-report', icon: FileText },
+      { title: 'Equipment Templates', href: '/equipment-templates', icon: Folder },
+    ],
+  },
+
   { title: 'Calendar', href: '/calendar', icon: Folder },
 ];
+
 
 const reviewerNav: NavItem[] = [
   { title: 'Dashboard', href: '/review', icon: LayoutGrid },

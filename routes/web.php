@@ -16,6 +16,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\Api\PhotoReportController;
 use App\Http\Controllers\AiReportDraftController;
+use App\Http\Controllers\Api\EquipmentTemplateController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -63,9 +64,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
 
+    // ✅ Your existing main report UI route
     Route::get('/report', function () {
         return inertia('Reports/IndexInspector');
     })->name('reports.inspector.index');
+
+    // ✅ FIX ADDED: /reports should also show main report UI (doesn't change anything else)
+    Route::get('/reports', function () {
+        return inertia('Reports/IndexInspector');
+    })->name('reports.index');
 
     // Create new PV report
     Route::get('/pv-report', function () {
@@ -80,6 +87,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'reportId' => $report,
         ]);
     })->name('pv-report.edit');
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ Equipment Templates (Inertia Page)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/equipment-templates', function () {
+        return Inertia::render('EquipmentTemplates/Index');
+    })->name('equipment-templates.index');
 
     /*
     |--------------------------------------------------------------------------
@@ -102,18 +118,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Notifications
     |--------------------------------------------------------------------------
     */
-    Route::get('/notifications', [NotificationController::class, 'feed'])
-        ->name('notifications.index');
+    Route::get('/notifications', [NotificationController::class, 'feed'])->name('notifications.index');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
     Route::get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
     Route::get('/notifications/stats', [NotificationController::class, 'stats'])->name('notifications.stats');
 
-    // Keep this controller version (your earlier one)
     Route::post('/notifications/test', [NotificationController::class, 'sendTest'])
         ->middleware(['auth'])
         ->name('notifications.test');
-
 
     /*
     |--------------------------------------------------------------------------
@@ -178,14 +191,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['auth'])->group(function () {
         // Review dashboard
         Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
-        
+
         // Individual report review
         Route::get('/reports/{report}/review', [ReviewerController::class, 'showReview'])->name('reports.showReview');
-        
+
         // Additional review routes (optional)
         Route::get('/reports/{report}/compare', [ReviewerController::class, 'compare'])->name('reports.compare');
         Route::get('/reports/{report}/comments', [ReviewerController::class, 'comments'])->name('reports.comments');
-        
+
         // Review actions
         Route::post('/reports/{report}/approve', [ReviewerController::class, 'approve'])->name('reports.approve');
         Route::post('/reports/{report}/reject', [ReviewerController::class, 'reject'])->name('reports.reject');
@@ -233,14 +246,21 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
     Route::post('/reports/{id}/submit', [ReportController::class, 'submit']);
     Route::post('/reports/{id}/approve', [ReportController::class, 'approve']);
 
-    //ai
-
+    // ai
     Route::post('/ai/pv-report-draft', [AiReportDraftController::class, 'generatePv'])
         ->middleware(['auth'])
         ->name('ai.pv-report-draft.generate.web');
 
-
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ Equipment Template API Routes (Axios should call /api/equipment-templates)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/equipment-templates', [EquipmentTemplateController::class, 'index']);
+    Route::post('/equipment-templates', [EquipmentTemplateController::class, 'store']);
+    Route::get('/equipment-templates/{id}', [EquipmentTemplateController::class, 'show']);
+    Route::put('/equipment-templates/{id}', [EquipmentTemplateController::class, 'update']);
+    Route::delete('/equipment-templates/{id}', [EquipmentTemplateController::class, 'destroy']);
 });
-
 
 require __DIR__ . '/settings.php';

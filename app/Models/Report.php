@@ -50,6 +50,7 @@ class Report extends Model
         'creation_date',
         'submission_date',
         'json_data',
+        'equipment_template_id', // ✅ add this
     ];
 
     /**
@@ -288,5 +289,12 @@ class Report extends Model
         return $this->photoReport ? $this->photoReport->id : null;
     }
 
+    public function equipmentTemplate()
+    {
+        return $this->belongsTo(\App\Models\EquipmentTemplate::class, 'equipment_template_id');
+    }
+
+
+    
 
 }
