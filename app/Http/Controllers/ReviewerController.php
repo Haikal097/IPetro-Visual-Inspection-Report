@@ -14,25 +14,20 @@ class ReviewerController extends Controller
 {
     public function indexReviewer(Request $request)
     {
-        // ✅ (minimal fix) build query ONCE (your original duplicated the query setup)
         $query = Report::query();
 
-        // Reviewer sees ONLY reviewable statuses
         $query->whereIn('status', [
             'submitted',
             'in_review',
             'revisions_requested',
         ]);
 
-        // Exclude completed
         $query->whereNotIn('status', ['approved', 'rejected']);
 
-        // Order by submission_date first, then created_at
         $query->orderBy('submission_date', 'desc')
               ->orderBy('created_at', 'desc');
 
         $reports = $query->get()->map(function ($report) {
-            // Parse json_data from the reports table
             $jsonData = [];
             if ($report->json_data) {
                 try {
@@ -44,7 +39,6 @@ class ReviewerController extends Controller
                 }
             }
 
-            // Get photo reports for attachments count
             $photoReports = PhotoReport::where('report_id', $report->getKey())->get();
 
             $allPhotoItems = [];
@@ -64,28 +58,23 @@ class ReviewerController extends Controller
                 }
             }
 
-            // Count attachments (photos with image URLs)
             $attachmentsCount = count(array_filter($allPhotoItems, function ($item) {
                 return !empty($item['image']);
             }));
 
-            // Extract data from json_data
             $title = $report->title ?? $jsonData['title'] ?? 'Untitled Report';
             $inspectorName = $jsonData['inspectorName'] ?? 'Unknown Inspector';
             $equipmentType = $jsonData['equipmentType'] ?? $jsonData['equipmentDescription'] ?? 'Unknown Equipment';
             $equipmentTag = $jsonData['equipmentTag'] ?? 'N/A';
             $inspectorRole = $jsonData['inspectorRole'] ?? 'Inspector';
 
-            // Get report number from json_data or use id
             $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->id;
 
-            // Inspection date fallback
             $inspectionDate =
                 $jsonData['reportDate']
                 ?? ($report->creation_date ? Carbon::parse($report->creation_date)->format('Y-m-d') : null)
                 ?? ($report->created_at ? Carbon::parse($report->created_at)->format('Y-m-d') : null);
 
-            // Determine status mapping for reviewer UI
             $statusMap = [
                 'submitted' => 'pending',
                 'in_review' => 'in-review',
@@ -130,7 +119,6 @@ class ReviewerController extends Controller
             ];
         });
 
-        // Stats
         $totalPending = $reports->where('status', 'pending')->count();
         $inReview = $reports->where('status', 'in-review')->count();
         $revisionsNeeded = $reports->where('status', 'revisions-requested')->count();
@@ -198,11 +186,8 @@ class ReviewerController extends Controller
 
     public function showReview(Report $report)
     {
-        // ✅ ensure creator relationship is available
         $report->loadMissing('creator');
 
-        // ✅ optional: mark as in_review when reviewer opens it
-        // (needed for "lock editing during review" feature)
         if ($report->status === 'submitted') {
             $report->update([
                 'status' => 'in_review',
@@ -217,7 +202,6 @@ class ReviewerController extends Controller
             'revisions_requested',
         ]);
 
-        // Decode reports.json_data
         $jsonData = [];
         if ($report->json_data) {
             try {
@@ -229,10 +213,8 @@ class ReviewerController extends Controller
             }
         }
 
-        // Get ALL related photo_reports rows
         $photoReports = PhotoReport::where('report_id', $report->getKey())->get();
 
-        // Extract all photo items from photo_reports.report_data
         $allPhotoItems = [];
         foreach ($photoReports as $photoReport) {
             if (!$photoReport->report_data) continue;
@@ -259,7 +241,6 @@ class ReviewerController extends Controller
                 'report_number' => $reportNumber,
                 'title' => $report->title ?? ($jsonData['title'] ?? 'Untitled Report'),
 
-                // ✅ fix: better fallback
                 'inspection_date' =>
                     $jsonData['reportDate']
                     ?? ($report->creation_date ? Carbon::parse($report->creation_date)->format('Y-m-d') : null)
@@ -313,7 +294,6 @@ class ReviewerController extends Controller
 
     public function approve(Report $report)
     {
-        // ✅ minimal guard
         abort_unless(Auth::user()?->role === 'reviewer' || Auth::user()?->role === 'admin', 403);
 
         abort_unless(in_array($report->status, ['submitted', 'in_review']), 403);
@@ -325,7 +305,7 @@ class ReviewerController extends Controller
         ]);
 
         ReportReviewLog::create([
-            'report_id' => $report->id,
+            'report_id' => $report->getKey(), // ✅ FIX
             'reviewer_id' => Auth::id(),
             'action' => 'approved',
             'message' => null,
@@ -336,7 +316,6 @@ class ReviewerController extends Controller
 
     public function reject(Request $request, Report $report)
     {
-        // ✅ minimal guard
         abort_unless(Auth::user()?->role === 'reviewer' || Auth::user()?->role === 'admin', 403);
 
         abort_unless(in_array($report->status, ['submitted', 'in_review']), 403);
@@ -351,7 +330,7 @@ class ReviewerController extends Controller
         ]);
 
         ReportReviewLog::create([
-            'report_id' => $report->id,
+            'report_id' => $report->getKey(), // ✅ FIX
             'reviewer_id' => Auth::id(),
             'action' => 'rejected',
             'message' => $request->message,
@@ -362,7 +341,6 @@ class ReviewerController extends Controller
 
     public function requestRevision(Request $request, Report $report)
     {
-        // ✅ minimal guard
         abort_unless(Auth::user()?->role === 'reviewer' || Auth::user()?->role === 'admin', 403);
 
         abort_unless(in_array($report->status, ['submitted', 'in_review']), 403);
@@ -377,7 +355,7 @@ class ReviewerController extends Controller
         ]);
 
         ReportReviewLog::create([
-            'report_id' => $report->id,
+            'report_id' => $report->getKey(), // ✅ FIX
             'reviewer_id' => Auth::id(),
             'action' => 'revisions_requested',
             'message' => $request->message,
