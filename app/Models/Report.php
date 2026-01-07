@@ -309,6 +309,28 @@ class Report extends Model
         return 'report_id';
     }
 
+    private function countPhotoReportImages($photoReport): int
+        {
+            if (!$photoReport) return 0;
+
+            // report_data might be JSON string OR already array
+            $data = $photoReport->report_data;
+
+            if (is_string($data)) {
+                $data = json_decode($data, true);
+            }
+
+            if (!is_array($data)) return 0;
+
+            $items = $data['items'] ?? [];
+            if (!is_array($items)) return 0;
+
+            // count only items that have "image"
+            return collect($items)
+                ->filter(fn ($it) => !empty($it['image']))
+                ->count();
+        }
+
 
 }
 
