@@ -6,13 +6,24 @@ type Notif = {
   id: string;
   title: string;
   type: string;
+
+  // ✅ report notif
+  report_id?: number | null;
+  status?: string | null;
+  message?: string | null;
+  url?: string | null;
+  actor_name?: string | null;
+
+  // inspection notif
   inspection_id?: number | null;
   start_at?: string | null;
   tag?: string | null;
   location?: string | null;
+
   created_at?: string | null;
   read_at?: string | null;
 };
+
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -21,10 +32,8 @@ export default function NotificationBell() {
   const [recent, setRecent] = useState<Notif[]>([]);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ add: small loading state (optional)
   const [loading, setLoading] = useState(false);
 
-  // ✅ helper: CSRF header (so you don’t repeat)
   function csrfHeaders() {
     return {
       "X-Requested-With": "XMLHttpRequest",
@@ -33,7 +42,6 @@ export default function NotificationBell() {
     };
   }
 
-  // ✅ keep your original load(), just enhance with try/finally + loading
   async function load() {
     try {
       setLoading(true);
@@ -65,40 +73,52 @@ export default function NotificationBell() {
     await load();
   }
 
-  // ✅ open notification -> mark read -> reload -> navigate
-  const openNotification = async (n: Notif) => {
-    await axios.post(`/notifications/${n.id}/read`, {}, { headers: csrfHeaders() });
+  // ✅ Decide where to go for each notification
+  const resolveTargetUrl = (n: Notif) => {
+    // Prefer backend url if provided
+    if (n.url) return n.url;
 
-    // refresh counters/list so the bell updates immediately
-    await load();
+    // Inspection notification
+    if (n.inspection_id) return `/inspection-calendar?inspection=${n.inspection_id}`;
 
-    // navigate
-    if (n.inspection_id) {
-      router.visit(`/inspection-calendar?inspection=${n.inspection_id}`);
-      // OR: router.visit(`/inspections/${n.inspection_id}`);
-    } else {
-      router.visit("/inspection-calendar");
-    }
+    // Report notification
+    if (n.report_id) return `/pv-report/${n.report_id}`;
 
-    setOpen(false);
+    // fallback
+    return "/dashboard";
   };
 
-  // ✅ send test reminder (backend route /notifications/test)
-  async function sendTestReminder() {
-    await fetch(`/notifications/test`, {
-      method: "POST",
-      headers: csrfHeaders(),
-    });
+  const openNotification = async (n: any) => {
+  await axios.post(`/notifications/${n.id}/read`, {}, { headers: csrfHeaders() });
+  await load();
+
+  // ✅ Prefer backend-provided URL
+  if (n.url) {
+    router.visit(n.url);
+  } else if (n.report_id) {
+    router.visit(`/pv-report/${n.report_id}`);
+  } else if (n.inspection_id) {
+    router.visit(`/inspection-calendar?inspection=${n.inspection_id}`);
+  } else {
+    router.visit("/inspection-calendar");
+  }
+
+  setOpen(false);
+};
+
+
+
+
+  async function refresh() {
     await load();
   }
 
   useEffect(() => {
     load();
-    const t = window.setInterval(load, 30_000); // refresh every 30s
+    const t = window.setInterval(load, 30_000);
     return () => window.clearInterval(t);
   }, []);
 
-  // ✅ refresh when opening dropdown (so user sees latest instantly)
   useEffect(() => {
     if (open) load();
   }, [open]);
@@ -120,13 +140,7 @@ export default function NotificationBell() {
         className="relative rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
         aria-label="Notifications"
       >
-        {/* bell icon */}
-        <svg
-          className="h-5 w-5 text-gray-700 dark:text-gray-200"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="h-5 w-5 text-gray-700 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -147,7 +161,6 @@ export default function NotificationBell() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
             <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               Notifications
-              {/* ✅ optional tiny loading indicator */}
               {loading && <span className="text-[10px] text-gray-400">(refreshing)</span>}
             </div>
 
@@ -161,11 +174,10 @@ export default function NotificationBell() {
             </button>
           </div>
 
-          {/* ✅ add test button (small + non invasive) */}
           <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
             <button
               type="button"
-              onClick={sendTestReminder}
+              onClick={refresh}
               className="w-full rounded-lg border border-gray-200 dark:border-gray-800 px-3 py-2 text-sm font-semibold text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-900"
             >
               Refresh
@@ -175,9 +187,7 @@ export default function NotificationBell() {
           <div className="max-h-[360px] overflow-auto">
             {unread.length > 0 ? (
               <>
-                <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">
-                  UNREAD
-                </div>
+                <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">UNREAD</div>
 
                 {unread.map((n) => (
                   <button
@@ -187,41 +197,55 @@ export default function NotificationBell() {
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">
                           {n.title}
                         </div>
+
+                        {(n as any).message && (
+                          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {(n as any).message}
+                          </div>
+                        )}
+
+                        {/* extra metadata */}
                         <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {n.tag ? `Tag: ${n.tag}` : ""}
+                          {n.status ? `Status: ${n.status}` : ""}
+                          {n.tag ? `${n.status ? " • " : ""}Tag: ${n.tag}` : ""}
                           {n.location ? ` • ${n.location}` : ""}
                         </div>
+
+                        {/* long reviewer message */}
+                        {n.message ? (
+                          <div className="mt-2 text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap line-clamp-3">
+                            {n.message}
+                          </div>
+                        ) : null}
                       </div>
-                      <span className="mt-1 h-2 w-2 rounded-full bg-red-500"></span>
+
+                      <span className="mt-1 h-2 w-2 rounded-full bg-red-500 shrink-0"></span>
                     </div>
 
-                    {n.inspection_id && (
-                      <div className="mt-2">
-                        <Link
-                          href={`/inspection-calendar?inspection=${n.inspection_id}`}
-                          className="text-xs font-semibold text-red-600 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          View in calendar
-                        </Link>
 
-                        {/* ✅ mark as read only (no navigation) */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markRead(n.id);
-                          }}
-                          className="ml-3 text-xs font-semibold text-gray-600 hover:underline dark:text-gray-300"
-                        >
-                          Mark as read
-                        </button>
-                      </div>
-                    )}
+                    <div className="mt-2 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markRead(n.id);
+                        }}
+                        className="text-xs font-semibold text-gray-600 hover:underline dark:text-gray-300"
+                      >
+                        Mark as read
+                      </button>
+
+                      {/* optional quick link */}
+                      {(n.url || n.report_id || n.inspection_id) && (
+                        <span className="text-xs font-semibold text-red-600 hover:underline">
+                          Open
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </>
@@ -231,34 +255,45 @@ export default function NotificationBell() {
               </div>
             )}
 
-            <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">
-              RECENT
-            </div>
+            <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">RECENT</div>
 
             {recent.length ? (
-              recent.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => openNotification(n)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900"
-                >
-                  <div className="text-sm text-gray-900 dark:text-white">{n.title}</div>
-                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {n.read_at ? "Read" : "Unread"}
-                  </div>
-                </button>
-              ))
-            ) : (
-              <div className="px-4 pb-4 text-sm text-gray-500 dark:text-gray-400">
-                No notifications yet.
-              </div>
-            )}
+                recent.map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => openNotification(n)}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900"
+                  >
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {n.title}
+                    </div>
+
+                    {n.message ? (
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                        {n.message}
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {n.read_at ? "Read" : "Unread"}
+                      </div>
+                    )}
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 pb-4 text-sm text-gray-500 dark:text-gray-400">
+                  No notifications yet.
+                </div>
+              )}
+
           </div>
 
-          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
             <Link href="/inspection-calendar" className="text-sm font-semibold text-red-600 hover:underline">
-              Open Inspection Calendar
+              Calendar
+            </Link>
+            <Link href="/reports" className="text-sm font-semibold text-red-600 hover:underline">
+              Reports
             </Link>
           </div>
         </div>
