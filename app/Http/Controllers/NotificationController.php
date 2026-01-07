@@ -8,34 +8,46 @@ use App\Notifications\InspectionReminderNotification;
 
 class NotificationController extends Controller
 {
-            public function feed(Request $request)
-        {
-            $user = $request->user();
-            $limit = (int) ($request->query('limit', 10));
+    public function feed(Request $request)
+{
+    $user = $request->user();
+    $limit = (int) ($request->query('limit', 10));
 
-            $map = function ($n) {
-                return [
-                    'id' => $n->id,
-                    'type' => $n->data['type'] ?? null,
-                    'title' => $n->data['title'] ?? 'Notification',
-                    'inspection_id' => $n->data['inspection_id'] ?? null,
-                    'start_at' => $n->data['start_at'] ?? null,
-                    'tag' => $n->data['tag'] ?? null,
-                    'location' => $n->data['location'] ?? null,
-                    'read_at' => $n->read_at,
-                    'created_at' => optional($n->created_at)->toDateTimeString(),
-                ];
-            };
+    $map = function ($n) {
+    $data = $n->data ?? [];
 
-            $unread = $user->unreadNotifications()->latest()->take($limit)->get()->map($map);
-            $recent = $user->notifications()->latest()->take($limit)->get()->map($map);
+    return [
+        'id' => $n->id,
+        'type' => $n->data['type'] ?? null,
+        'title' => $n->data['title'] ?? 'Notification',
 
-            return response()->json([
-                'unread_count' => $user->unreadNotifications()->count(),
-                'unread' => $unread,
-                'recent' => $recent,
-            ]);
-        }
+        // ✅ support REPORT notifications
+        'report_id' => $n->data['report_id'] ?? null,
+        'status' => $n->data['status'] ?? null,
+        'message' => $n->data['message'] ?? null,
+        'url' => $n->data['url'] ?? null,
+
+        // ✅ keep your existing inspection fields
+        'inspection_id' => $n->data['inspection_id'] ?? null,
+        'start_at' => $n->data['start_at'] ?? null,
+        'tag' => $n->data['tag'] ?? null,
+        'location' => $n->data['location'] ?? null,
+
+        'read_at' => $n->read_at,
+        'created_at' => optional($n->created_at)->toDateTimeString(),
+    ];
+};
+
+
+    $unread = $user->unreadNotifications()->latest()->take($limit)->get()->map($map);
+    $recent = $user->notifications()->latest()->take($limit)->get()->map($map);
+
+    return response()->json([
+        'unread_count' => $user->unreadNotifications()->count(),
+        'unread' => $unread,
+        'recent' => $recent,
+    ]);
+}
 
 
     public function markRead(Request $request, string $id)

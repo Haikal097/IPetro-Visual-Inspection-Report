@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 
+
 class PhotoReportController extends Controller
 {
     /**
@@ -132,13 +133,25 @@ class PhotoReportController extends Controller
             // }
             
             // Check if report is in draft status (optional)
-            if ($report->status === 'submitted' || $report->status === 'approved') {
-                Log::warning('Cannot edit submitted report: ' . $reportId);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot edit photo report for submitted/approved report',
-                ], 400);
-            }
+            // ✅ IMPORTANT: Lock editing when under review/finalized
+                if (in_array($report->status, ['submitted', 'in_review', 'approved'])) {
+                    Log::info("Read-only: photo report save ignored for report_id={$reportId}, status={$report->status}");
+
+                    // Return 200 so frontend won't show "Save failed" error spam
+                    $existing = PhotoReport::where('report_id', $reportId)->first();
+
+                    return response()->json([
+                        'success' => true,
+                        'read_only' => true,
+                        'message' => 'Report is read-only. Changes are not saved.',
+                        'data' => [
+                            'photo_report' => $existing,
+                            'photo_report_id' => $existing?->id,
+                            'main_report_status' => $report->status,
+                        ],
+                    ], 200);
+                }
+
             
             // Prepare data for photo report
             $photoReportData = [
@@ -297,7 +310,7 @@ class PhotoReportController extends Controller
             }
             
             // Check if report is already submitted or approved
-            if ($report->status === 'submitted' || $report->status === 'approved') {
+            if (in_array($report->status, ['submitted', 'in_review', 'approved'])) {
                 Log::warning('Cannot submit already submitted report: ' . $reportId);
                 return response()->json([
                     'success' => false,
@@ -349,6 +362,14 @@ class PhotoReportController extends Controller
             
             Log::info('Main report status updated to submitted for report_id: ' . $reportId);
             
+            // ✅ SEND NOTIFICATION TO INSPECTOR (the person who submitted)
+                $user = Auth::user();
+                if ($user) {
+                    $user->notify(new ReportSubmitted($report, $user));
+                    Log::info("Notification sent: report_submitted to user_id={$user->id} report_id={$reportId}");
+                }
+
+
             return response()->json([
                 'success' => true,
                 'message' => 'Photo report submitted successfully',
