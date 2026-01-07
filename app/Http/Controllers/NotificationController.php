@@ -3,38 +3,40 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Notifications\DatabaseNotification;
 use App\Notifications\InspectionReminderNotification;
 
 class NotificationController extends Controller
 {
-    public function feed(Request $request)
-    {
-        $user = $request->user();
+            public function feed(Request $request)
+        {
+            $user = $request->user();
+            $limit = (int) ($request->query('limit', 10));
 
-        $limit = (int) ($request->query('limit', 10));
-
-        $notifications = $user->notifications()
-            ->latest()
-            ->take($limit)
-            ->get()
-            ->map(function ($n) {
+            $map = function ($n) {
                 return [
                     'id' => $n->id,
                     'type' => $n->data['type'] ?? null,
                     'title' => $n->data['title'] ?? 'Notification',
                     'inspection_id' => $n->data['inspection_id'] ?? null,
+                    'start_at' => $n->data['start_at'] ?? null,
+                    'tag' => $n->data['tag'] ?? null,
+                    'location' => $n->data['location'] ?? null,
                     'read_at' => $n->read_at,
-                    'created_at' => $n->created_at->toDateTimeString(),
+                    'created_at' => optional($n->created_at)->toDateTimeString(),
                 ];
-            });
+            };
 
-        return response()->json([
-            'unread_count' => $user->unreadNotifications()->count(),
-            'notifications' => $notifications,
-        ]);
-    }
+            $unread = $user->unreadNotifications()->latest()->take($limit)->get()->map($map);
+            $recent = $user->notifications()->latest()->take($limit)->get()->map($map);
+
+            return response()->json([
+                'unread_count' => $user->unreadNotifications()->count(),
+                'unread' => $unread,
+                'recent' => $recent,
+            ]);
+        }
+
 
     public function markRead(Request $request, string $id)
     {
@@ -50,32 +52,31 @@ class NotificationController extends Controller
         $request->user()->unreadNotifications->markAsRead();
         return response()->json(['success' => true]);
     }
+
     public function sendTest(Request $request)
     {
-    $request->user()->notify(new InspectionReminderNotification([
-        'type' => 'test_reminder',
-        'inspection_id' => null,
-        'title' => 'TEST REMINDER: Notification system is working ✅',
-        'start_at' => now()->toDateTimeString(),
-        'tag' => 'TEST',
-        'location' => 'Dashboard',
-    ]));
+        $request->user()->notify(new InspectionReminderNotification([
+            'type' => 'test_reminder',
+            'inspection_id' => null,
+            'title' => 'TEST REMINDER: Notification system is working ✅',
+            'start_at' => now()->toDateTimeString(),
+            'tag' => 'TEST',
+            'location' => 'Dashboard',
+        ]));
 
-    return response()->json(['success' => true]);
+        return response()->json(['success' => true]);
     }
 
     public function stats(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    return response()->json([
-        'total' => $user->notifications()->count(),
-        'unread' => $user->unreadNotifications()->count(),
-        'today' => $user->notifications()->whereDate('created_at', now()->toDateString())->count(),
-        'reminders_1h' => $user->notifications()->where('data->type', 'inspection_reminder_1h')->count(),
-        'reminders_1d' => $user->notifications()->where('data->type', 'inspection_reminder_1d')->count(),
-    ]);
-}
-
-
+        return response()->json([
+            'total' => $user->notifications()->count(),
+            'unread' => $user->unreadNotifications()->count(),
+            'today' => $user->notifications()->whereDate('created_at', now()->toDateString())->count(),
+            'reminders_1h' => $user->notifications()->where('data->type', 'inspection_reminder_1h')->count(),
+            'reminders_1d' => $user->notifications()->where('data->type', 'inspection_reminder_1d')->count(),
+        ]);
+    }
 }
