@@ -195,6 +195,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // ✅ keep ONE review index route
         Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
 
+        // Rejected reports page
+        Route::get('/reviewapproved', [ReviewerController::class, 'approvedPage'])->name('review.approved');
+        Route::get('/reviewrejected', [ReviewerController::class, 'rejectedPage'])->name('review.rejected');
+
         Route::get('/reviewer/report', function () {
             return Inertia::render('Reviewer/Report');
         })->name('reviewer.report');
