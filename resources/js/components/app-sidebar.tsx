@@ -13,7 +13,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Folder, LayoutGrid, Image, FileText, Shield, Users } from 'lucide-react';
+import { Folder, LayoutGrid, Image, FileText, Shield, Users, Calendar } from 'lucide-react';
 import AppLogo from './app-logo';
 import { useEffect } from 'react';
 
@@ -31,13 +31,12 @@ const inspectorNav: NavItem[] = [
     ],
   },
 
-  { title: 'Calendar', href: '/calendar', icon: Folder },
+  { title: 'Calendar', href: '/calendar', icon: Calendar },
 ];
 
 
 const reviewerNav: NavItem[] = [
   { title: 'Dashboard', href: '/review', icon: LayoutGrid },
-  { title: 'Reports', href: '/reviewer/report', icon: FileText },
 ];
 
 const adminNav: NavItem[] = [

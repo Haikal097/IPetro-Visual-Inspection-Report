@@ -255,30 +255,6 @@ export default function PhotoReportPrint({ data, reportId, photoReportId, logoUr
           </tbody>
         </table>
 
-        {/* Footer Signatures - Compact */}
-        <div style={styles.signatureSection}>
-          <table style={styles.signatureTable}>
-            <tbody>
-              <tr>
-                <td style={styles.signatureCell}>
-                  <div style={styles.signatureBox}>
-                    <div style={styles.signatureLabel}>Prepared By:</div>
-                    <div style={styles.signatureLine}></div>
-                    <div style={styles.signatureSubtext}>Name & Signature</div>
-                  </div>
-                </td>
-                <td style={styles.signatureCell}>
-                  <div style={styles.signatureBox}>
-                    <div style={styles.signatureLabel}>Approved By:</div>
-                    <div style={styles.signatureLine}></div>
-                    <div style={styles.signatureSubtext}>Name & Signature</div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
         {/* Report IDs - Hidden in print */}
         <div className="no-print" style={styles.debugInfo}>
           <p>Main Report ID: {reportId || 'N/A'} | Photo Report ID: {photoReportId || 'N/A'}</p>

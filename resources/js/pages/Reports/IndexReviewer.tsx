@@ -535,13 +535,6 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
                                                         <Eye className="h-4 w-4" />
                                                         Review
                                                     </Link>
-                                                    <Link
-                                                        href={`/reports/${item.dbId}/comments`}
-                                                        className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
-                                                    >
-                                                        <MessageSquare className="h-4 w-4" />
-                                                        Comments
-                                                    </Link>
                                                 </div>
                                             </td>
                                         </tr>
