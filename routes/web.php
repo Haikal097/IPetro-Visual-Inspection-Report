@@ -37,7 +37,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Dashboard
     |--------------------------------------------------------------------------
     */
-     // ✅ Dashboard only for inspector
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
 
@@ -54,7 +53,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/photos/temp/{filename}', [PhotoController::class, 'getTempUrl'])->name('photos.temp-url');
     Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
 
-    // Optional: update / delete photo by ID (if you use it)
     Route::put('/photos/{photo}', [PhotoController::class, 'update'])->name('photos.update');
     Route::delete('/photos/{photo}', [PhotoController::class, 'destroy'])->name('photos.destroy');
 
@@ -65,13 +63,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
 
-    // ✅ Your existing main report UI route (keep as-is)
+    // ✅ FIX (necessary): /report previously rendered page without props (causes buttons to feel broken)
+    // Keep route for backward compatibility but redirect to correct page
     Route::get('/report', function () {
-        return inertia('Reports/IndexInspector');
+        return redirect('/reports');
     })->name('reports.inspector.index');
 
-    // ✅ FIX: only ONE /reports route (use controller so it has DB stats + reports)
+    // ✅ Correct inspector reports list with props
     Route::get('/reports', [ReportController::class, 'reportsPage'])->name('reports.page');
+
+    // ✅ Inspector Resubmit (should be accessible to inspector, not inside reviewer-only group)
+    Route::post('/reports/{report}/resubmit', [ReportController::class, 'resubmit'])->name('reports.resubmit');
 
     // Create new PV report
     Route::get('/pv-report', function () {
@@ -107,7 +109,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'update'])->name('inspection.calendar.update');
     Route::delete('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'destroy'])->name('inspection.calendar.destroy');
 
-    // Old calendar page route
     Route::get('/calendar', function () {
         return Inertia::render('calendar/InspectionCalendar');
     })->name('calendar');
@@ -157,19 +158,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Photo Report (Page + CRUD Endpoints)
     |--------------------------------------------------------------------------
     */
-    // Inertia page
     Route::get('/reports/photo-report', function () {
         return inertia('Reports/PhotoReport', [
             'reportId' => request()->query('report_id'),
         ]);
     })->name('reports.photo-report.page');
 
-    // Printable view
     Route::get('/reports/photo-report/print', function () {
         return Inertia::render('PhotoReportPrint');
     })->name('photo-report.print');
 
-    // API-like endpoints (for Axios fetch/save)
     Route::get('/reports/{reportId}/photo-report', [PhotoReportController::class, 'getPhotoReport'])
         ->name('reports.photo-report.get');
     Route::post('/reports/{reportId}/photo-report', [PhotoReportController::class, 'savePhotoReport'])
@@ -186,30 +184,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Reviewer Pages
     |--------------------------------------------------------------------------
     */
-    Route::get('/review', function () {
-        return inertia('Reports/IndexReviewer');
-    })->name('reports.reviewer');
+    // ✅ keep ONE review index route
+    Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
 
     Route::get('/reviewer/report', function () {
         return Inertia::render('Reviewer/Report');
     })->name('reviewer.report');
 
     Route::middleware(['auth'])->group(function () {
-        // Review dashboard
-        Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
-
-        // Individual report review
         Route::get('/review/report/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
 
-        // Additional review routes (optional)
         Route::get('/reports/{report}/compare', [ReviewerController::class, 'compare'])->name('reports.compare');
         Route::get('/reports/{report}/comments', [ReviewerController::class, 'comments'])->name('reports.comments');
 
-        // Review actions (✅ use /review/... to match frontend)
+        // ✅ review actions (only once)
         Route::post('/review/{report}/approve', [ReviewerController::class, 'approve'])->name('review.approve');
         Route::post('/review/{report}/reject', [ReviewerController::class, 'reject'])->name('review.reject');
         Route::post('/review/{report}/request-revision', [ReviewerController::class, 'requestRevision'])->name('review.requestRevision');
-
     });
 
     /*
@@ -237,19 +228,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/albums/{album}', [AlbumController::class, 'update'])->name('albums.update');
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Report Submission + Approval Actions
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('review')->group(function () {
-    Route::post('/{report}/approve', [ReviewerController::class, 'approve'])->name('review.approve');
-    Route::post('/{report}/reject', [ReviewerController::class, 'reject'])->name('review.reject');
-    Route::post('/{report}/request-revision', [ReviewerController::class, 'requestRevision'])->name('review.requestRevision');
-
-});
-
 });
 
 /*
@@ -272,9 +250,9 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
         ->name('ai.pv-report-draft.generate.web');
 
     /*
-    |--------------------------------------------------------------------------
+    |----------------------------------------------------------------------
     | ✅ Equipment Template API Routes (Axios should call /api/equipment-templates)
-    |--------------------------------------------------------------------------
+    |----------------------------------------------------------------------
     */
     Route::get('/equipment-templates', [EquipmentTemplateController::class, 'index']);
     Route::post('/equipment-templates', [EquipmentTemplateController::class, 'store']);

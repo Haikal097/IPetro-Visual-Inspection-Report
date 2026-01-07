@@ -9,6 +9,17 @@ use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
+// ✅ ADDED (needed for finalize/download/verify functions you already wrote)
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+// ✅ If you actually use these models/classes, keep them.
+// If not, you can remove later, but I’m NOT touching your logic.
+use App\Models\PhotoReport;
+use App\Models\ReportAudit;
+use App\Models\ReportReviewLog;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 class ReportController extends Controller
 {
     public function create()
@@ -82,62 +93,81 @@ class ReportController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        $report = Report::findOrFail($id);
-        $user = Auth::user();
+        {
+            $report = Report::findOrFail($id);
+            $user = Auth::user();
 
-        // Check authorization
-        if ($report->creator_id !== $user->id && $user->role !== 'admin') {
+            // Check authorization
+            if ($report->creator_id !== $user->id && $user->role !== 'admin') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized to edit this report'
+                ], 403);
+            }
+
+            // ✅ lock editing during review (submitted/in_review/approved) unless admin
+            // ✅ allow revisions_requested
+            if (in_array($report->status, ['submitted', 'in_review', 'approved']) && $user->role !== 'admin') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot edit submitted, in review, or approved reports'
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'nullable|string|max:255',
+                'json_data.reportNo' => 'required|string|max:100',
+                'json_data.equipmentTag' => 'required|string|max:100',
+                'json_data.equipmentType' => 'required|string|max:100',
+                'json_data.plantUnitArea' => 'required|string|max:200',
+                'json_data.doshRegistration' => 'nullable|string|max:100',
+                'json_data.reportDate' => 'required|date',
+
+                // ✅ IMPORTANT: inspector edit endpoint should NOT allow submitted (use resubmit route)
+                // Admin can still set anything if you want (handled below)
+                'status' => $user->role === 'admin'
+                    ? 'required|in:draft,submitted,in_review,revisions_requested,approved,rejected'
+                    : 'required|in:draft,revisions_requested',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // ✅ prevent inspector from changing status away from revisions_requested except to draft (optional safety)
+            if ($user->role !== 'admin') {
+                // If currently revisions_requested, allow only draft/revisions_requested save
+                if ($report->status === 'revisions_requested' && !in_array($request->status, ['draft', 'revisions_requested'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid status change. Please use Resubmit to send back to reviewer.'
+                    ], 403);
+                }
+            }
+
+            $updateData = [
+                'status' => $request->status,
+                'json_data' => $request->json_data,
+            ];
+
+            // ✅ Only update submission_date when admin sets to submitted from a non-submitted state
+            // (Inspector resubmit uses resubmit() method)
+            if ($user->role === 'admin' && $request->status === 'submitted' && $report->status !== 'submitted') {
+                $updateData['submission_date'] = now();
+            }
+
+            $report->update($updateData);
+
             return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized to edit this report'
-            ], 403);
+                'success' => true,
+                'message' => 'Report updated successfully',
+                'data' => $report
+            ]);
         }
 
-        // Can't edit submitted/approved reports unless admin
-        if (in_array($report->status, ['submitted', 'approved']) && $user->role !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot edit submitted or approved reports'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'title' => 'nullable|string|max:255',
-            'json_data.reportNo' => 'required|string|max:100',
-            'json_data.equipmentTag' => 'required|string|max:100',
-            'json_data.equipmentType' => 'required|string|max:100',
-            'json_data.plantUnitArea' => 'required|string|max:200',
-            'json_data.doshRegistration' => 'nullable|string|max:100', // Changed here too
-            'json_data.reportDate' => 'required|date',
-            'status' => 'required|in:draft,submitted',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $updateData = [
-            'status' => $request->status,
-            'json_data' => $request->json_data,
-        ];
-
-        // Only update submission_date if changing to submitted
-        if ($request->status === 'submitted' && $report->status !== 'submitted') {
-            $updateData['submission_date'] = now();
-        }
-
-        $report->update($updateData);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Report updated successfully',
-            'data' => $report
-        ]);
-    }
 
     public function show($id)
     {
@@ -438,13 +468,16 @@ class ReportController extends Controller
 
         $reports = $query->orderBy('creation_date', 'desc')->get();
 
-        // Stats
+        // ✅ CHANGED (necessary): include the extra statuses in stats
         $stats = [
             'total' => $reports->count(),
             'draft' => $reports->where('status', 'draft')->count(),
             'submitted' => $reports->where('status', 'submitted')->count(),
             'approved' => $reports->where('status', 'approved')->count(),
             'rejected' => $reports->where('status', 'rejected')->count(),
+            // keep extra stats optional (frontend can ignore)
+            'in_review' => $reports->where('status', 'in_review')->count(),
+            'revisions_requested' => $reports->where('status', 'revisions_requested')->count(),
         ];
 
         // Map DB -> your UI shape
@@ -483,5 +516,34 @@ class ReportController extends Controller
                 'q' => $request->q ?? '',
             ],
         ]);
+    }
+
+    public function resubmit(Report $report)
+    {
+        // Only report owner (creator) can resubmit
+        abort_unless(Auth::id() === $report->creator_id, 403);
+
+        // Only allow resubmit if revisions_requested
+        abort_unless($report->status === 'revisions_requested', 403);
+
+        $report->update([
+            'status' => 'submitted',
+            'submission_date' => now(),
+        ]);
+
+        // optional: clear reviewer assignment if you want
+        // $report->update(['reviewer_id' => null]);
+
+        ReportReviewLog::create([
+            'report_id' => $report->report_id,  // ✅ correct
+            // or BEST:
+            // 'report_id' => $report->getKey(),
+            'reviewer_id' => auth()->id(),
+            'action' => 'resubmitted',
+            'message' => null,
+        ]);
+
+
+        return redirect('/reports')->with('success', 'Report resubmitted successfully.');
     }
 }
