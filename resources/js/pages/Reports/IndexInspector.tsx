@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+
 import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import { useMemo, useState, useEffect } from 'react';
@@ -455,7 +456,7 @@ export default function Report({
 
                       {canEdit(report.status) && (
                         <Link
-                          href={`/pv-report/${report.id}/edit`}
+                          href={`/reports/${report.id}/edit`}
                           className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
                         >
                           <Edit className="h-4 w-4" />
@@ -565,7 +566,7 @@ export default function Report({
 
                             {canEdit(report.status) && (
                               <Link
-                                href={`/pv-report/${report.id}/edit`}
+                                href={`/reports/${report.id}/edit`}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
                               >
                                 <Edit className="h-3.5 w-3.5" />

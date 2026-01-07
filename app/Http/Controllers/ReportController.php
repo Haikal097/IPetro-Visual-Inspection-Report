@@ -546,4 +546,22 @@ class ReportController extends Controller
 
         return redirect('/reports')->with('success', 'Report resubmitted successfully.');
     }
+
+    public function edit(Report $report)
+{
+    // Allow only owner or admin (optional)
+    abort_unless(Auth::id() === $report->creator_id || Auth::user()->role === 'admin', 403);
+
+    $u = auth()->user();
+    $signatureUrl = $u?->signature_path
+        ? asset('storage/' . $u->signature_path)
+        : null;
+
+    return Inertia::render('Reports/PVReport', [
+        'report' => $report,          // ✅ send report to PVReport page
+        'mode' => 'edit',             // optional
+        'signatureUrl' => $signatureUrl,
+    ]);
+}
+
 }
