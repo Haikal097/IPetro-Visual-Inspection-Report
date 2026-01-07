@@ -1,10 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { 
-  FileText, 
-  CheckCircle, 
-  XCircle, 
+import {
+  FileText,
+  CheckCircle,
+  XCircle,
   Calendar,
   User,
   Eye,
@@ -23,17 +23,14 @@ export default function ShowReview({ report }: { report: any }) {
   console.log("PHOTO_REPORTS ROWS:", report.photo_reports);
   console.log("PHOTO ITEMS:", report.photo_report_items);
 
+  // ✅ IMPORTANT: some payloads use report_id instead of id
+  const reportId = report?.id ?? report?.report_id;
+
   const [activeTab, setActiveTab] = useState<'overview' | 'findings' | 'photo-items' | 'details'>('overview');
 
   const breadcrumbs = [
-    {
-      title: 'Reports',
-      href: '/review',
-    },
-    {
-      title: report.report_number || 'Report Details',
-      href: '#',
-    },
+    { title: 'Reports', href: '/review' },
+    { title: report.report_number || 'Report Details', href: '#' },
   ];
 
   const getStatusColor = (status: string) => {
@@ -43,41 +40,43 @@ export default function ShowReview({ report }: { report: any }) {
       case 'in_review': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
       case 'approved': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
       case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'revisions_requested': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
   const handleViewPhotoReport = () => {
-    router.get(`/reports/photo-report?report_id=${report.id}`);
+    if (!reportId) return alert('Missing reportId from backend (report.id/report.report_id is null)');
+    router.get(`/reports/photo-report?report_id=${reportId}`);
   };
 
-  // Filter photo items that have actual data
-  const validPhotoItems = report.photo_report_items?.filter((item: any) => 
+  const validPhotoItems = report.photo_report_items?.filter((item: any) =>
     item.title || item.findings || item.image || item.requirements
   );
 
-  // ✅ ONLY NECESSARY CHANGE:
-  // show Review Actions for reviewable statuses (and supports backend flag if provided)
-  const canReview =
-    typeof report?.can_review === 'boolean'
-      ? report.can_review
-      : ['submitted', 'in_review', 'revisions_requested'].includes(report.status);
+  const [currentStatus, setCurrentStatus] = useState(report.status);
 
-  //add
+  const canReview = ['submitted', 'in_review'].includes(report.status);
+
+
+  // ✅ REVIEW ACTIONS (routes match web.php: /review/{report}/...)
   const approveReport = () => {
-      router.post(`/review/${report.id}/approve`);
-    };
-    //reject
-    const rejectReport = () => {
-      const message = prompt("Reason for rejection? (optional)") || "";
-      router.post(`/review/${report.id}/reject`, { message });
-    };
-    //request revision
-    const requestRevision = () => {
-      const message = prompt("What needs to be fixed? (required)");
-      if (!message || !message.trim()) return;
-      router.post(`/review/${report.id}/request-revision`, { message });
-    };
+  if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
+  router.post(`/review/${reportId}/approve`);
+};
+
+const rejectReport = () => {
+  if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
+  const message = prompt("Reason for rejection? (optional)") || "";
+  router.post(`/review/${reportId}/reject`, { message });
+};
+
+const requestRevision = () => {
+  if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
+  const message = prompt("What needs to be fixed? (required)");
+  if (!message || !message.trim()) return;
+  router.post(`/review/${reportId}/request-revision`, { message });
+};
 
 
   return (
@@ -98,17 +97,20 @@ export default function ShowReview({ report }: { report: any }) {
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
                       {report.title || report.report_data?.title || 'Untitled Report'}
                     </h1>
-                    <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(report.status)}`}>
-                      {report.status.toUpperCase()}
+
+                    {/* ✅ use currentStatus so UI updates after action */}
+                    <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(currentStatus)}`}>
+                      {String(currentStatus).toUpperCase()}
                     </div>
                   </div>
                   <p className="mt-1.5 text-gray-600 dark:text-gray-400 text-lg">
-                    Report No: {report.report_number || report.report_data?.reportNo || 'N/A'} • 
+                    Report No: {report.report_number || report.report_data?.reportNo || 'N/A'} •
                     Created: {report.created_at?.split(' ')[0] || 'N/A'}
                   </p>
                 </div>
               </div>
             </div>
+
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleViewPhotoReport}
@@ -259,7 +261,6 @@ export default function ShowReview({ report }: { report: any }) {
                 {/* FINDINGS TAB */}
                 {activeTab === 'findings' && (
                   <div className="space-y-6">
-                    {/* Initial Findings */}
                     {report.report_data?.initialFinding && (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -272,7 +273,6 @@ export default function ShowReview({ report }: { report: any }) {
                       </div>
                     )}
 
-                    {/* External Findings */}
                     {report.report_data?.externalFinding && (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -285,7 +285,6 @@ export default function ShowReview({ report }: { report: any }) {
                       </div>
                     )}
 
-                    {/* Internal Findings */}
                     {report.report_data?.internalFinding && (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -298,7 +297,6 @@ export default function ShowReview({ report }: { report: any }) {
                       </div>
                     )}
 
-                    {/* NDT Results */}
                     {report.report_data?.ndt && (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -311,7 +309,6 @@ export default function ShowReview({ report }: { report: any }) {
                       </div>
                     )}
 
-                    {/* Recommendations */}
                     {report.report_data?.recommendations && (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -332,24 +329,22 @@ export default function ShowReview({ report }: { report: any }) {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                       Photo Report Items ({validPhotoItems?.length || 0})
                     </h3>
-                    
+
                     {validPhotoItems?.length > 0 ? (
                       <div className="space-y-4">
                         {validPhotoItems.map((item: any, index: number) => (
                           <div key={item.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                             <div className="flex items-start gap-4">
-                              {/* Image Preview */}
                               {item.image && (
                                 <div className="flex-shrink-0">
-                                  <img 
-                                    src={item.image} 
+                                  <img
+                                    src={item.image}
                                     alt={item.title || `Photo ${index + 1}`}
                                     className="w-32 h-32 object-cover rounded-lg"
                                   />
                                 </div>
                               )}
-                              
-                              {/* Item Details */}
+
                               <div className="flex-1">
                                 <div className="flex items-start justify-between mb-2">
                                   <h4 className="font-medium text-gray-900 dark:text-white">
@@ -357,8 +352,7 @@ export default function ShowReview({ report }: { report: any }) {
                                   </h4>
                                   <span className="text-xs text-gray-500">ID: {item.id}</span>
                                 </div>
-                                
-                                {/* Findings */}
+
                                 {item.findings && (
                                   <div className="mb-3">
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Findings:</p>
@@ -367,8 +361,7 @@ export default function ShowReview({ report }: { report: any }) {
                                     </p>
                                   </div>
                                 )}
-                                
-                                {/* Requirements */}
+
                                 {item.requirements && (
                                   <div>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Requirements:</p>
@@ -393,13 +386,12 @@ export default function ShowReview({ report }: { report: any }) {
                 {/* DETAILS TAB */}
                 {activeTab === 'details' && (
                   <div className="space-y-6">
-                    {/* Report Metadata */}
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Report Metadata</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Report ID</p>
-                          <p className="font-medium text-gray-900 dark:text-white">{report.id}</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{reportId ?? 'N/A'}</p>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Report Number</p>
@@ -407,7 +399,7 @@ export default function ShowReview({ report }: { report: any }) {
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Status</p>
-                          <p className="font-medium text-gray-900 dark:text-white">{report.status}</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{currentStatus}</p>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Last Updated</p>
@@ -416,7 +408,6 @@ export default function ShowReview({ report }: { report: any }) {
                       </div>
                     </div>
 
-                    {/* Photo Reports Metadata */}
                     {report.photo_reports && report.photo_reports.length > 0 && (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Photo Reports</h3>
@@ -463,7 +454,6 @@ export default function ShowReview({ report }: { report: any }) {
                       </div>
                     )}
 
-                    {/* JSON Data Dump (for debugging) */}
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Raw Report Data</h3>
                       <div className="bg-gray-900 rounded-lg p-4 overflow-auto max-h-96">
@@ -518,8 +508,8 @@ export default function ShowReview({ report }: { report: any }) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Current Status</p>
-                  <span className={`px-3 py-1 text-xs rounded-full ${getStatusColor(report.status)}`}>
-                    {report.status.toUpperCase()}
+                  <span className={`px-3 py-1 text-xs rounded-full ${getStatusColor(currentStatus)}`}>
+                    {String(currentStatus).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -576,22 +566,23 @@ export default function ShowReview({ report }: { report: any }) {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Review Actions</h3>
                 <div className="space-y-3">
                   <button
-                    onClick={() => {approveReport}}
+                    onClick={approveReport}
                     className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-emerald-700 hover:to-emerald-800"
                   >
                     <CheckCircle className="h-4 w-4" />
                     Approve Report
                   </button>
                   <button
-                    onClick={() => {rejectReport}}
+                    onClick={rejectReport}
                     className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800"
                   >
                     <XCircle className="h-4 w-4" />
                     Reject Report
                   </button>
-                  <button 
-                  onClick={requestRevision}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <button
+                    onClick={requestRevision}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
                     <MessageSquare className="h-4 w-4" />
                     Request Revision
                   </button>

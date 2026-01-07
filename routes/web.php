@@ -203,10 +203,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/reports/{report}/compare', [ReviewerController::class, 'compare'])->name('reports.compare');
         Route::get('/reports/{report}/comments', [ReviewerController::class, 'comments'])->name('reports.comments');
 
-        // Review actions
-        Route::post('/reports/{report}/approve', [ReviewerController::class, 'approve'])->name('reports.approve');
-        Route::post('/reports/{report}/reject', [ReviewerController::class, 'reject'])->name('reports.reject');
-        Route::post('/reports/{report}/request-revisions', [ReviewerController::class, 'requestRevisions'])->name('reports.requestRevisions');
+        // Review actions (✅ use /review/... to match frontend)
+        Route::post('/review/{report}/approve', [ReviewerController::class, 'approve'])->name('review.approve');
+        Route::post('/review/{report}/reject', [ReviewerController::class, 'reject'])->name('review.reject');
+        Route::post('/review/{report}/request-revision', [ReviewerController::class, 'requestRevision'])->name('review.requestRevision');
+
     });
 
     /*
@@ -233,6 +234,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/albums', [AlbumController::class, 'store'])->name('albums.store');
     Route::put('/albums/{album}', [AlbumController::class, 'update'])->name('albums.update');
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Report Submission + Approval Actions
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('review')->group(function () {
+    Route::post('/{report}/approve', [ReviewerController::class, 'approve'])->name('review.approve');
+    Route::post('/{report}/reject', [ReviewerController::class, 'reject'])->name('review.reject');
+    Route::post('/{report}/request-revision', [ReviewerController::class, 'requestRevision'])->name('review.requestRevision');
+
+});
 
 });
 
