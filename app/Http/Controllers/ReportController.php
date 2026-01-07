@@ -93,81 +93,80 @@ class ReportController extends Controller
     }
 
     public function update(Request $request, $id)
-        {
-            $report = Report::findOrFail($id);
-            $user = Auth::user();
+    {
+        $report = Report::findOrFail($id);
+        $user = Auth::user();
 
-            // Check authorization
-            if ($report->creator_id !== $user->id && $user->role !== 'admin') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized to edit this report'
-                ], 403);
-            }
-
-            // ✅ lock editing during review (submitted/in_review/approved) unless admin
-            // ✅ allow revisions_requested
-            if (in_array($report->status, ['submitted', 'in_review', 'approved']) && $user->role !== 'admin') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot edit submitted, in review, or approved reports'
-                ], 403);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'title' => 'nullable|string|max:255',
-                'json_data.reportNo' => 'required|string|max:100',
-                'json_data.equipmentTag' => 'required|string|max:100',
-                'json_data.equipmentType' => 'required|string|max:100',
-                'json_data.plantUnitArea' => 'required|string|max:200',
-                'json_data.doshRegistration' => 'nullable|string|max:100',
-                'json_data.reportDate' => 'required|date',
-
-                // ✅ IMPORTANT: inspector edit endpoint should NOT allow submitted (use resubmit route)
-                // Admin can still set anything if you want (handled below)
-                'status' => $user->role === 'admin'
-                    ? 'required|in:draft,submitted,in_review,revisions_requested,approved,rejected'
-                    : 'required|in:draft,revisions_requested',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // ✅ prevent inspector from changing status away from revisions_requested except to draft (optional safety)
-            if ($user->role !== 'admin') {
-                // If currently revisions_requested, allow only draft/revisions_requested save
-                if ($report->status === 'revisions_requested' && !in_array($request->status, ['draft', 'revisions_requested'])) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Invalid status change. Please use Resubmit to send back to reviewer.'
-                    ], 403);
-                }
-            }
-
-            $updateData = [
-                'status' => $request->status,
-                'json_data' => $request->json_data,
-            ];
-
-            // ✅ Only update submission_date when admin sets to submitted from a non-submitted state
-            // (Inspector resubmit uses resubmit() method)
-            if ($user->role === 'admin' && $request->status === 'submitted' && $report->status !== 'submitted') {
-                $updateData['submission_date'] = now();
-            }
-
-            $report->update($updateData);
-
+        // Check authorization
+        if ($report->creator_id !== $user->id && $user->role !== 'admin') {
             return response()->json([
-                'success' => true,
-                'message' => 'Report updated successfully',
-                'data' => $report
-            ]);
+                'success' => false,
+                'message' => 'Unauthorized to edit this report'
+            ], 403);
         }
 
+        // ✅ lock editing during review (submitted/in_review/approved) unless admin
+        // ✅ allow revisions_requested
+        if (in_array($report->status, ['submitted', 'in_review', 'approved']) && $user->role !== 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot edit submitted, in review, or approved reports'
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'title' => 'nullable|string|max:255',
+            'json_data.reportNo' => 'required|string|max:100',
+            'json_data.equipmentTag' => 'required|string|max:100',
+            'json_data.equipmentType' => 'required|string|max:100',
+            'json_data.plantUnitArea' => 'required|string|max:200',
+            'json_data.doshRegistration' => 'nullable|string|max:100',
+            'json_data.reportDate' => 'required|date',
+
+            // ✅ IMPORTANT: inspector edit endpoint should NOT allow submitted (use resubmit route)
+            // Admin can still set anything if you want (handled below)
+            'status' => $user->role === 'admin'
+                ? 'required|in:draft,submitted,in_review,revisions_requested,approved,rejected'
+                : 'required|in:draft,revisions_requested',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // ✅ prevent inspector from changing status away from revisions_requested except to draft (optional safety)
+        if ($user->role !== 'admin') {
+            // If currently revisions_requested, allow only draft/revisions_requested save
+            if ($report->status === 'revisions_requested' && !in_array($request->status, ['draft', 'revisions_requested'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid status change. Please use Resubmit to send back to reviewer.'
+                ], 403);
+            }
+        }
+
+        $updateData = [
+            'status' => $request->status,
+            'json_data' => $request->json_data,
+        ];
+
+        // ✅ Only update submission_date when admin sets to submitted from a non-submitted state
+        // (Inspector resubmit uses resubmit() method)
+        if ($user->role === 'admin' && $request->status === 'submitted' && $report->status !== 'submitted') {
+            $updateData['submission_date'] = now();
+        }
+
+        $report->update($updateData);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Report updated successfully',
+            'data' => $report
+        ]);
+    }
 
     public function show($id)
     {
@@ -283,6 +282,9 @@ class ReportController extends Controller
     {
         $user = $request->user();
 
+        // ✅ ADDED (necessary): safe report key for PK report_id
+        $rid = $report->getKey();
+
         // Must have signature
         if (!$user->signature_path || !Storage::disk('public')->exists($user->signature_path)) {
             return back()->withErrors([
@@ -302,7 +304,8 @@ class ReportController extends Controller
         }
 
         // Snapshot signature
-        $snapshotSig = "reports/{$report->id}/signature.png";
+        // ✅ CHANGED (necessary): use $rid instead of $report->id
+        $snapshotSig = "reports/{$rid}/signature.png";
         Storage::disk('public')->copy($user->signature_path, $snapshotSig);
         $report->signature_snapshot_path = $snapshotSig;
 
@@ -313,7 +316,8 @@ class ReportController extends Controller
         $report->save();
 
         // Generate SIGNED PDF snapshot (freeze)
-        $pdfPath = "reports/{$report->id}/final_report.pdf";
+        // ✅ CHANGED (necessary): use $rid instead of $report->id
+        $pdfPath = "reports/{$rid}/final_report.pdf";
         $pdf = Pdf::loadView('reports.pdf', [
             'report' => $report->fresh()->load('inspector'),
         ]);
@@ -328,8 +332,9 @@ class ReportController extends Controller
         $report->save();
 
         // Audit log (optional)
+        // ✅ CHANGED (necessary): use $rid instead of $report->id
         ReportAudit::create([
-            'report_id' => $report->id,
+            'report_id' => $rid,
             'user_id' => $user->id,
             'action' => 'FINALIZED',
             'meta' => [
@@ -343,29 +348,37 @@ class ReportController extends Controller
 
     public function download(Request $request, Report $report)
     {
+        // ✅ ADDED (necessary): safe report key for PK report_id
+        $rid = $report->getKey();
+
         // Only allow if finalized
         if (!$report->pdf_snapshot_path || !Storage::disk('public')->exists($report->pdf_snapshot_path)) {
             return back()->withErrors(['pdf' => 'PDF not available. Finalize the report first.']);
         }
 
         // Audit optional
+        // ✅ CHANGED (necessary): use $rid instead of $report->id
         \App\Models\ReportAudit::create([
-            'report_id' => $report->id,
+            'report_id' => $rid,
             'user_id' => $request->user()->id,
             'action' => 'DOWNLOADED_PDF',
             'meta' => ['ip' => $request->ip()],
         ]);
 
-        return Storage::disk('public')->download($report->pdf_snapshot_path, "REPORT-{$report->id}.pdf");
+        // ✅ CHANGED (necessary): use $rid in filename too
+        return Storage::disk('public')->download($report->pdf_snapshot_path, "REPORT-{$rid}.pdf");
     }
 
     public function verify(string $token)
     {
         $report = \App\Models\Report::where('verification_token', $token)->firstOrFail();
 
+        // ✅ ADDED (necessary): safe report key for PK report_id
+        $rid = $report->getKey();
+
         return inertia('Reports/Verify', [
             'report' => [
-                'id' => $report->id,
+                'id' => $rid,
                 'signed_at' => optional($report->signed_at)->toISOString(),
                 'pdf_sha256' => $report->pdf_sha256,
                 'signature_sha256' => $report->signature_sha256,
@@ -375,7 +388,11 @@ class ReportController extends Controller
 
     private function reportChecklist($report, $user)
     {
-        $data = $report->json_data ? json_decode($report->json_data, true) : [];
+        // ✅ CHANGED (necessary): json_data may already be array
+        $data = $report->json_data ?? [];
+        if (is_string($data)) {
+            $data = json_decode($data, true) ?: [];
+        }
 
         $hasEquipment = !empty($data['equipment'] ?? null);
         $hasFindings  = !empty($data['findings'] ?? null);
@@ -440,111 +457,110 @@ class ReportController extends Controller
             ->count();
     }
 
-public function reportsPage(Request $request)
-{
-    $user = Auth::user();
+    public function reportsPage(Request $request)
+    {
+        $user = Auth::user();
 
-    $query = Report::with(['creator', 'reviewer', 'photoReport', 'equipmentTemplate']);
+        $query = Report::with(['creator', 'reviewer', 'photoReport', 'equipmentTemplate']);
 
-    // Users can only see their own reports unless admin/reviewer
-    if (!in_array($user->role, ['admin', 'reviewer'])) {
-        $query->where('creator_id', $user->id);
-    }
+        // Users can only see their own reports unless admin/reviewer
+        if (!in_array($user->role, ['admin', 'reviewer'])) {
+            $query->where('creator_id', $user->id);
+        }
 
-    // optional: filter status
-    if ($request->filled('status') && $request->status !== 'all') {
-        $query->where('status', $request->status);
-    }
+        // optional: filter status
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
 
-    // optional: search (title, equipmentTag, equipmentType from json_data)
-    if ($request->filled('q')) {
-        $q = $request->q;
-        $query->where(function ($sub) use ($q) {
-            $sub->where('title', 'like', "%{$q}%")
-                ->orWhere('json_data->equipmentTag', 'like', "%{$q}%")
-                ->orWhere('json_data->equipmentType', 'like', "%{$q}%");
-        });
-    }
+        // optional: search (title, equipmentTag, equipmentType from json_data)
+        if ($request->filled('q')) {
+            $q = $request->q;
+            $query->where(function ($sub) use ($q) {
+                $sub->where('title', 'like', "%{$q}%")
+                    ->orWhere('json_data->equipmentTag', 'like', "%{$q}%")
+                    ->orWhere('json_data->equipmentType', 'like', "%{$q}%");
+            });
+        }
 
-    $reports = $query->orderBy('creation_date', 'desc')->get();
+        $reports = $query->orderBy('creation_date', 'desc')->get();
 
-    // ✅ CHANGED (necessary): include the extra statuses in stats
-    $stats = [
-        'total' => $reports->count(),
-        'draft' => $reports->where('status', 'draft')->count(),
-        'submitted' => $reports->where('status', 'submitted')->count(),
-        'approved' => $reports->where('status', 'approved')->count(),
-        'rejected' => $reports->where('status', 'rejected')->count(),
-        'in_review' => $reports->where('status', 'in_review')->count(),
-        'revisions_requested' => $reports->where('status', 'revisions_requested')->count(),
-    ];
-
-    // ✅ ADDED (necessary): fetch all review logs in ONE query (no N+1)
-    $reportIds = $reports->map(fn($r) => $r->getKey())->values()->all();
-
-    $logsByReportId = \App\Models\ReportReviewLog::whereIn('report_id', $reportIds)
-        ->orderBy('created_at', 'desc')
-        ->get()
-        ->groupBy('report_id');
-
-    // Map DB -> your UI shape
-    $mappedReports = $reports->map(function ($r) use ($logsByReportId) {
-        $json = $r->json_data ?? [];
-
-        // ✅ ADDED (necessary): prepare logs + latest reason
-        $logs = $logsByReportId[$r->getKey()] ?? collect();
-
-        $reviewLogs = $logs->map(function ($l) {
-            return [
-                'id' => $l->id,
-                'action' => $l->action,
-                'message' => $l->message,
-                'created_at' => $l->created_at?->format('Y-m-d H:i:s'),
-            ];
-        })->values()->all();
-
-        $latestWithMessage = $logs->first(fn($l) => !empty(trim((string) $l->message))) ?? $logs->first();
-
-        return [
-            'id' => (int) $r->getKey(),
-            'title' => $r->title ?? ('Report #' . $r->getKey()),
-
-            'equipment' => $json['equipmentType'] ?? ($r->equipment_type ?? 'N/A'),
-            'equipmentTag' => $json['equipmentTag'] ?? 'N/A',
-
-            'status' => $r->status,
-
-            'createdBy' => $r->creator?->name ?? 'Unknown',
-            'createdAt' => $r->creation_date
-                ? Carbon::parse($r->creation_date)->format('Y-m-d')
-                : ($r->created_at ? Carbon::parse($r->created_at)->format('Y-m-d') : '—'),
-
-            'lastUpdated' => $r->updated_at ? Carbon::parse($r->updated_at)->diffForHumans() : '—',
-
-            'reviewer' => $r->reviewer?->name ?? 'Not Assigned',
-
-            'dueDate' => $json['dueDate'] ?? null,
-
-            // ✅ existing: image count
-            'attachments' => $this->countPhotoReportImages($r->photoReport),
-
-            // ✅ ADDED (necessary): what your modal needs
-            'review_logs' => $reviewLogs, // optional history in modal
-            'review_reason' => $latestWithMessage?->message,
-            'review_reason_at' => $latestWithMessage?->created_at?->format('Y-m-d H:i:s'),
+        // ✅ CHANGED (necessary): include the extra statuses in stats
+        $stats = [
+            'total' => $reports->count(),
+            'draft' => $reports->where('status', 'draft')->count(),
+            'submitted' => $reports->where('status', 'submitted')->count(),
+            'approved' => $reports->where('status', 'approved')->count(),
+            'rejected' => $reports->where('status', 'rejected')->count(),
+            'in_review' => $reports->where('status', 'in_review')->count(),
+            'revisions_requested' => $reports->where('status', 'revisions_requested')->count(),
         ];
-    });
 
-    return inertia('Reports/IndexInspector', [
-        'reports' => $mappedReports,
-        'stats' => $stats,
-        'filters' => [
-            'status' => $request->status ?? 'all',
-            'q' => $request->q ?? '',
-        ],
-    ]);
-}
+        // ✅ ADDED (necessary): fetch all review logs in ONE query (no N+1)
+        $reportIds = $reports->map(fn($r) => $r->getKey())->values()->all();
 
+        $logsByReportId = \App\Models\ReportReviewLog::whereIn('report_id', $reportIds)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->groupBy('report_id');
+
+        // Map DB -> your UI shape
+        $mappedReports = $reports->map(function ($r) use ($logsByReportId) {
+            $json = $r->json_data ?? [];
+
+            // ✅ ADDED (necessary): prepare logs + latest reason
+            $logs = $logsByReportId[$r->getKey()] ?? collect();
+
+            $reviewLogs = $logs->map(function ($l) {
+                return [
+                    'id' => $l->id,
+                    'action' => $l->action,
+                    'message' => $l->message,
+                    'created_at' => $l->created_at?->format('Y-m-d H:i:s'),
+                ];
+            })->values()->all();
+
+            $latestWithMessage = $logs->first(fn($l) => !empty(trim((string) $l->message))) ?? $logs->first();
+
+            return [
+                'id' => (int) $r->getKey(),
+                'title' => $r->title ?? ('Report #' . $r->getKey()),
+
+                'equipment' => $json['equipmentType'] ?? ($r->equipment_type ?? 'N/A'),
+                'equipmentTag' => $json['equipmentTag'] ?? 'N/A',
+
+                'status' => $r->status,
+
+                'createdBy' => $r->creator?->name ?? 'Unknown',
+                'createdAt' => $r->creation_date
+                    ? Carbon::parse($r->creation_date)->format('Y-m-d')
+                    : ($r->created_at ? Carbon::parse($r->created_at)->format('Y-m-d') : '—'),
+
+                'lastUpdated' => $r->updated_at ? Carbon::parse($r->updated_at)->diffForHumans() : '—',
+
+                'reviewer' => $r->reviewer?->name ?? 'Not Assigned',
+
+                'dueDate' => $json['dueDate'] ?? null,
+
+                // ✅ existing: image count
+                'attachments' => $this->countPhotoReportImages($r->photoReport),
+
+                // ✅ ADDED (necessary): what your modal needs
+                'review_logs' => $reviewLogs, // optional history in modal
+                'review_reason' => $latestWithMessage?->message,
+                'review_reason_at' => $latestWithMessage?->created_at?->format('Y-m-d H:i:s'),
+            ];
+        });
+
+        return inertia('Reports/IndexInspector', [
+            'reports' => $mappedReports,
+            'stats' => $stats,
+            'filters' => [
+                'status' => $request->status ?? 'all',
+                'q' => $request->q ?? '',
+            ],
+        ]);
+    }
 
     public function resubmit(Report $report)
     {
@@ -571,25 +587,26 @@ public function reportsPage(Request $request)
             'message' => null,
         ]);
 
-
         return redirect('/reports')->with('success', 'Report resubmitted successfully.');
     }
 
     public function edit(Report $report)
-{
-    // Allow only owner or admin (optional)
-    abort_unless(Auth::id() === $report->creator_id || Auth::user()->role === 'admin', 403);
+    {
+        // Allow only owner or admin (optional)
+        abort_unless(Auth::id() === $report->creator_id || Auth::user()->role === 'admin', 403);
 
-    $u = auth()->user();
-    $signatureUrl = $u?->signature_path
-        ? asset('storage/' . $u->signature_path)
-        : null;
+        $u = auth()->user();
+        $signatureUrl = $u?->signature_path
+            ? asset('storage/' . $u->signature_path)
+            : null;
 
-    return Inertia::render('Reports/PVReport', [
-        'report' => $report,          // ✅ send report to PVReport page
-        'mode' => 'edit',             // optional
-        'signatureUrl' => $signatureUrl,
-    ]);
-}
+        return Inertia::render('Reports/PVReport', [
+            // ✅ ADDED (necessary): keep compatibility with component that expects reportId
+            'reportId' => $report->getKey(),
 
+            'report' => $report,          // ✅ keep your existing prop
+            'mode' => 'edit',             // optional
+            'signatureUrl' => $signatureUrl,
+        ]);
+    }
 }
