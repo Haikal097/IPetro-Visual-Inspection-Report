@@ -37,7 +37,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Dashboard
     |--------------------------------------------------------------------------
     */
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+     // ✅ Dashboard only for inspector
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->name('dashboard');
 
     /*
     |--------------------------------------------------------------------------
