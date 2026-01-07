@@ -21,7 +21,7 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ currentPath }: AdminSidebarProps) {
   const navItems = [
-    { href: '/admin', icon: Home, label: 'Dashboard' },
+    /*{ href: '/admin', icon: Home, label: 'Dashboard' },*/
     { href: '/admin/users', icon: Users, label: 'User Management' },
   ];
 

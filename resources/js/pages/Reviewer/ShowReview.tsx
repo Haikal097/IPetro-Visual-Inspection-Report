@@ -34,7 +34,7 @@ export default function ShowReview({ report }: { report: any }) {
   const [printData, setPrintData] = useState<any>(null);
 
   const breadcrumbs = [
-    { title: 'Reports', href: '/review' },
+    { title: 'Review Dashboard', href: '/review' },
     { title: report.report_number || 'Report Details', href: '#' },
   ];
 
@@ -174,7 +174,7 @@ export default function ShowReview({ report }: { report: any }) {
                 </div>
               </div>
             </div>
-
+            {/* Not Used 
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleViewPhotoReport}
@@ -190,7 +190,7 @@ export default function ShowReview({ report }: { report: any }) {
                 <Printer className="h-4 w-4" />
                 Print Photo Report
               </button>
-            </div>
+            </div>*/}
           </div>
         </div>
 
