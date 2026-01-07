@@ -118,6 +118,7 @@ export default function PVReport() {
     recommendations: !!form.recommendations?.trim(),
     signature: !!signatureUrl,
     };
+    checklist.ready = Object.values(checklist).every(Boolean);
 
     type EquipmentTemplate = {
     id: number;
@@ -142,6 +143,9 @@ const ready = Object.values(checklist).every(Boolean);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [reportId, setReportId] = useState<number | null>(null);
+    const [reportStatus, setReportStatus] = useState<
+  'draft' | 'submitted' | 'in_review' | 'revisions_requested' | 'approved' | 'rejected' | null
+>(null);
 
     const printRef = useRef<HTMLDivElement>(null);
 
@@ -391,6 +395,14 @@ const ready = Object.values(checklist).every(Boolean);
                         console.error("Failed to merge stored data");
                     }
                 }
+
+                const dbStatus =
+                    responseData.data?.status ||
+                    responseData.data?.report?.status ||
+                    null;
+
+                    if (dbStatus) setReportStatus(dbStatus);
+
             }
         } catch (error) {
             console.error('Failed to load report:', error);
@@ -524,13 +536,35 @@ const ready = Object.values(checklist).every(Boolean);
 
     // Handle submit for review
     const handleSubmit = async () => {
-        if (!confirm('Submit this report for review? You will not be able to edit it after submission.')) {
-            return;
-        }
-        
-        setIsSubmitting(true);
-        await handleSave('submitted');
-    };
+  if (!confirm('Submit this report for review?')) return;
+
+  setIsSubmitting(true);
+
+  try {
+    // New report → POST submitted
+    if (!reportId) {
+      const result = await handleSave('submitted');
+      if (result.success && result.reportId) {
+        setReportStatus('submitted');
+        toast.success('Report submitted!');
+      }
+      return;
+    }
+
+    // Existing report → submit endpoint
+    const res = await api.post(`/reports/${reportId}/submit`);
+    if (res.data?.success) {
+      setReportStatus('submitted');
+      toast.success('Report submitted for review!');
+      localStorage.removeItem('ipetro_pv_report');
+    }
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || 'Submit failed');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
     // Handle save to database
     const handleSave = async (status: 'draft' | 'submitted' = 'draft', redirectAfterSave = false) => {
@@ -549,6 +583,19 @@ const ready = Object.values(checklist).every(Boolean);
             if (!title.trim()) {
                 title = generateAutoTitle(form);
             }
+
+            let effectiveStatus = status;
+
+                // Inspector editing revision → keep revisions_requested
+                if (reportId && reportStatus === 'revisions_requested') {
+                effectiveStatus = 'revisions_requested';
+                }
+
+                // Prevent PUT with submitted
+                if (reportId && status === 'submitted') {
+                effectiveStatus = 'draft';
+                }
+
 
             // Prepare the data
             const reportData = {
@@ -579,7 +626,7 @@ const ready = Object.values(checklist).every(Boolean);
                 },
 
                 report_no: form.reportNo,
-                status: status,
+                status: effectiveStatus,
                 };
 
             console.log('Sending report data:', reportData);

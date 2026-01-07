@@ -24,7 +24,7 @@ class DashboardController extends Controller
             ->orderBy('creation_date', 'desc')
             ->get();
 
-        return Inertia::render('dashboard', [
+        return Inertia::render('Dashboard', [
             'reports' => $reports
         ]);
     }
