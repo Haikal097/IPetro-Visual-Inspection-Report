@@ -1,3 +1,5 @@
+// Inspector and Reviewer - Show Single Report Details Page
+
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
@@ -31,7 +33,6 @@ export default function ShowReview({ report }: { report: any }) {
   const [printData, setPrintData] = useState<any>(null);
 
   const breadcrumbs = [
-    { title: 'Review Dashboard', href: '/review' },
     { title: report.report_number || 'Report Details', href: '#' },
   ];
 

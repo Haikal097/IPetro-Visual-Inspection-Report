@@ -529,7 +529,7 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <Link
-                                                        href={`/review/report/${item.dbId}`}
+                                                        href={`/report/show/${item.dbId}`}
                                                         className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/40"
                                                     >
                                                         <Eye className="h-4 w-4" />

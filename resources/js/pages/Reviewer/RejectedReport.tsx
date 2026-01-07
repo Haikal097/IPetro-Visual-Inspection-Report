@@ -261,7 +261,7 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
         router.reload({ only: ['reviews', 'stats'] });
     };
 
-    // Handle restore/review again action
+    /* Handle restore/review again action (UNUSED)
     const handleRestoreReview = (reportId: number) => {
         if (confirm('Are you sure you want to restore this report for review? This will change its status back to pending.')) {
             router.put(`/review/report/${reportId}/restore`, {}, {
@@ -270,7 +270,7 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
                 }
             });
         }
-    };
+    };*/
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -424,7 +424,7 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <Link
-                                                        href={`/review/report/${item.dbId}`}
+                                                        href={`/report/show/${item.dbId}`}
                                                         className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
                                                     >
                                                         <Eye className="h-4 w-4" />

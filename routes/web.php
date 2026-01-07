@@ -203,8 +203,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return Inertia::render('Reviewer/Report');
         })->name('reviewer.report');
 
-        Route::get('/review/report/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
-
         Route::get('/reports/{report}/compare', [ReviewerController::class, 'compare'])->name('reports.compare');
         Route::get('/reports/{report}/comments', [ReviewerController::class, 'comments'])->name('reports.comments');
 
@@ -213,6 +211,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/review/{report}/reject', [ReviewerController::class, 'reject'])->name('review.reject');
         Route::post('/review/{report}/request-revision', [ReviewerController::class, 'requestRevision'])->name('review.requestRevision');
     });
+    /*
+    
+    |--------------------------------------------------------------------------
+    | Single report page (Reviewer and Inspector)
+    |--------------------------------------------------------------------------
+    */
+    
+        Route::get('/report/show/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
 
     /*
     |--------------------------------------------------------------------------
