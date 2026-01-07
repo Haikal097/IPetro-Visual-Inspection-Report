@@ -28,7 +28,7 @@ export default function ShowReview({ report }: { report: any }) {
   const breadcrumbs = [
     {
       title: 'Reports',
-      href: '/reports',
+      href: '/review',
     },
     {
       title: report.report_number || 'Report Details',
@@ -55,6 +55,30 @@ export default function ShowReview({ report }: { report: any }) {
   const validPhotoItems = report.photo_report_items?.filter((item: any) => 
     item.title || item.findings || item.image || item.requirements
   );
+
+  // ✅ ONLY NECESSARY CHANGE:
+  // show Review Actions for reviewable statuses (and supports backend flag if provided)
+  const canReview =
+    typeof report?.can_review === 'boolean'
+      ? report.can_review
+      : ['submitted', 'in_review', 'revisions_requested'].includes(report.status);
+
+  //add
+  const approveReport = () => {
+      router.post(`/review/${report.id}/approve`);
+    };
+    //reject
+    const rejectReport = () => {
+      const message = prompt("Reason for rejection? (optional)") || "";
+      router.post(`/review/${report.id}/reject`, { message });
+    };
+    //request revision
+    const requestRevision = () => {
+      const message = prompt("What needs to be fixed? (required)");
+      if (!message || !message.trim()) return;
+      router.post(`/review/${report.id}/request-revision`, { message });
+    };
+
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -547,25 +571,27 @@ export default function ShowReview({ report }: { report: any }) {
             </div>
 
             {/* Actions Panel */}
-            {report.status === 'draft' && (
+            {canReview && (
               <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Review Actions</h3>
                 <div className="space-y-3">
                   <button
-                    onClick={() => {/* Handle approve */}}
+                    onClick={() => {approveReport}}
                     className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-emerald-700 hover:to-emerald-800"
                   >
                     <CheckCircle className="h-4 w-4" />
                     Approve Report
                   </button>
                   <button
-                    onClick={() => {/* Handle reject */}}
+                    onClick={() => {rejectReport}}
                     className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800"
                   >
                     <XCircle className="h-4 w-4" />
                     Reject Report
                   </button>
-                  <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <button 
+                  onClick={requestRevision}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                     <MessageSquare className="h-4 w-4" />
                     Request Revision
                   </button>

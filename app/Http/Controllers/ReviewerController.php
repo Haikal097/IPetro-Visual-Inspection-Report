@@ -7,6 +7,8 @@ use App\Models\PhotoReport; // This is your photo_report table
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ReviewerController extends Controller
 {
@@ -18,18 +20,30 @@ class ReviewerController extends Controller
         
         // Get reports that need review (not yet reviewed)
         // Adjust this logic based on your business rules
-        $query->where(function($q) {
-            $q->whereNull('reviewer_id') // Not assigned to a reviewer
-              ->orWhere('status', 'submitted') // Or has status 'submitted'
-              ->orWhere('status', 'draft'); // Or is in draft
-        });
+        // Reviewer should ONLY see reports that are submitted for review (not drafts)
+        $query->whereIn('status', [
+            'submitted',
+            'in_review',
+            'revisions_requested',
+        ]);
+
         
         // Exclude already approved/rejected reports
         $query->whereNotIn('status', ['approved', 'rejected']);
         
         // Order by submission date or creation date
+        $query = Report::query();
+
+        $query->whereIn('status', [
+            'submitted',
+            'in_review',
+            'revisions_requested',
+        ]);
+
         $query->orderBy('submission_date', 'desc')
-              ->orderBy('created_at', 'desc');
+            ->orderBy('created_at', 'desc');
+
+
         
         $reports = $query->get()->map(function ($report) {
             // Parse json_data from the reports table
@@ -84,13 +98,13 @@ class ReviewerController extends Controller
             
             // Determine status - map your DB status to frontend status
             $statusMap = [
-                'draft' => 'pending',
                 'submitted' => 'pending',
                 'in_review' => 'in-review',
-                'approved' => 'approved',
                 'revisions_requested' => 'revisions-requested',
+                'approved' => 'approved',
                 'rejected' => 'rejected',
             ];
+
             
             $status = $statusMap[$report->status] ?? 'pending';
             
@@ -286,6 +300,68 @@ class ReviewerController extends Controller
                 'photo_report_items' => $allPhotoItems,
             ],
         ]);
+
+        $canReview = in_array($report->status, [
+            'submitted',
+            'in_review',
+            'revisions_requested',
+        ]);
+
     }
+
+    public function approve(Report $report)
+{
+    // Only allow for reviewable statuses
+    abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
+
+    $report->update([
+        'status' => 'approved',
+        'reviewer_id' => Auth::id(),
+        'signed_at' => now(), // optional
+    ]);
+
+    // OPTIONAL: create notification to inspector (if you have notifications table)
+    // $this->notifyInspector($report, 'approved', 'Your report has been approved.');
+
+    return back()->with('success', 'Report approved.');
+}
+
+public function reject(Request $request, Report $report)
+{
+    abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
+
+    $request->validate([
+        'message' => 'nullable|string|max:2000',
+    ]);
+
+    $report->update([
+        'status' => 'rejected',
+        'reviewer_id' => Auth::id(),
+    ]);
+
+    // OPTIONAL notify with reason
+    // $this->notifyInspector($report, 'rejected', $request->message ?? 'Report rejected.');
+
+    return back()->with('success', 'Report rejected.');
+}
+
+public function requestRevision(Request $request, Report $report)
+{
+    abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
+
+    $request->validate([
+        'message' => 'required|string|max:2000',
+    ]);
+
+    $report->update([
+        'status' => 'revisions_requested',
+        'reviewer_id' => Auth::id(),
+    ]);
+
+    // OPTIONAL notify with comment
+    // $this->notifyInspector($report, 'revisions_requested', $request->message);
+
+    return back()->with('success', 'Revision requested.');
+}
 
 }
