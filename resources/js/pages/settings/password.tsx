@@ -1,4 +1,3 @@
-import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
 import InputError from '@/components/input-error';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -11,12 +10,14 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { edit } from '@/routes/user-password';
+
+// ✅ use settings routes
+import { edit as editPassword, update as updatePassword } from '@/routes/settings/user-password';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Password settings',
-        href: edit().url,
+        href: editPassword(), // ✅ string
     },
 ];
 
@@ -36,7 +37,8 @@ export default function Password() {
                     />
 
                     <Form
-                        {...PasswordController.update.form()}
+                        // ✅ use generated route form helper
+                        {...updatePassword.form()}
                         options={{
                             preserveScroll: true,
                         }}
@@ -74,9 +76,7 @@ export default function Password() {
                                         placeholder="Current password"
                                     />
 
-                                    <InputError
-                                        message={errors.current_password}
-                                    />
+                                    <InputError message={errors.current_password} />
                                 </div>
 
                                 <div className="grid gap-2">
@@ -111,9 +111,7 @@ export default function Password() {
                                         placeholder="Confirm password"
                                     />
 
-                                    <InputError
-                                        message={errors.password_confirmation}
-                                    />
+                                    <InputError message={errors.password_confirmation} />
                                 </div>
 
                                 <div className="flex items-center gap-4">

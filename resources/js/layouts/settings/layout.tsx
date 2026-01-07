@@ -2,10 +2,13 @@ import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn, isSameUrl, resolveUrl } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
-import { edit } from '@/routes/profile';
-import { show } from '@/routes/two-factor';
-import { edit as editPassword } from '@/routes/user-password';
+
+// ✅ FIXED IMPORT PATHS (settings routes are under /settings/*)
+import { edit as editAppearance } from '@/routes/settings/appearance';
+import settingsProfile from '@/routes/settings/profile';
+import { show } from '@/routes/settings/two-factor';
+import { edit as editPassword } from '@/routes/settings/user-password';
+
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
@@ -13,7 +16,7 @@ import { type PropsWithChildren } from 'react';
 const sidebarNavItems: NavItem[] = [
     {
         title: 'Profile',
-        href: edit(),
+        href: settingsProfile.edit(), // ✅ was edit()
         icon: null,
     },
     {
@@ -31,9 +34,8 @@ const sidebarNavItems: NavItem[] = [
         href: editAppearance(),
         icon: null,
     },
-
     {
-        title: "Signature",
+        title: 'Signature',
         href: '/profile/signature',
         icon: null,
     },
