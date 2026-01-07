@@ -1,7 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import PhotoReportPrint from '@/components/printable/PhotoReportPrint'; // Add this import
+import PhotoReportPrint from '@/components/printable/PhotoReportPrint';
+import PVReportPrint from '@/components/printable/PVReportPrint';
 import {
   FileText,
   CheckCircle,
@@ -55,35 +56,48 @@ export default function ShowReview({ report }: { report: any }) {
   };
 
   const handlePrintPhotoReport = () => {
-    if (!report.photo_reports || report.photo_reports.length === 0) {
-      alert('No photo report data available');
-      return;
-    }
+    const rd = report.report_data || {}; // PV form JSON
 
-    // Get the first photo report
-    const photoReport = report.photo_reports[0];
-    
-    // Prepare data for the print component
+    const firstPhotoReport = report.photo_reports?.[0] ?? null;
+
     const printData = {
-      reportTitle: photoReport.report_title || report.title || 'Untitled Report',
-      reportNumber: photoReport.report_number || report.report_number || 'N/A',
-      inspectionDate: photoReport.inspection_date || report.inspection_date || report.created_at,
-      pmt: photoReport.pmt || 'N/A',
-      tag: photoReport.tag || 'N/A',
-      description: photoReport.description || 'N/A',
-      plantUnit: photoReport.plant_unit || report.plant_unit || 'N/A',
+      title: report.title,
+      reportNo: rd.reportNo || report.report_number,
+      reportDate: rd.reportDate || report.created_at,
+
+      equipmentTag: rd.equipmentTag,
+      equipmentDescription: rd.equipmentDescription,
+      equipmentType: rd.equipmentType,
+      plantUnitArea: rd.plantUnitArea,
+      doshRegistration: rd.doshRegistration,
+
+      initialFinding: rd.initialFinding,
+      externalFinding: rd.externalFinding,
+      internalFinding: rd.internalFinding,
+
+      ndt: rd.ndt,
+      recommendations: rd.recommendations,
+
+      inspectorName: rd.inspectorName || report.creator?.name,
+      publishDate: rd.publishDate,
+
+      signatureUrl: report.signature_snapshot_url || report.signatureUrl || null, // adjust to your backend prop
+
+      photoReport: firstPhotoReport,
+
       items: report.photo_report_items?.map((item: any) => ({
         id: item.id,
-        title: item.title || `Item`,
-        findings: item.findings || '',
-        requirements: item.requirements || '',
-        image: item.image || null
-      })) || []
+        title: item.title,
+        findings: item.findings,
+        requirements: item.requirements,
+        image: item.image,
+      })) || [],
     };
 
     setPrintData(printData);
     setShowPrintPreview(true);
   };
+
 
   const validPhotoItems = report.photo_report_items?.filter((item: any) =>
     item.title || item.findings || item.image || item.requirements
@@ -125,16 +139,8 @@ export default function ShowReview({ report }: { report: any }) {
     }
   }, [showPrintPreview]);
 
-  // If showing print preview, render the PhotoReportPrint component
   if (showPrintPreview && printData) {
-    return (
-      <PhotoReportPrint 
-        data={printData}
-        reportId={reportId}
-        photoReportId={report.photo_reports?.[0]?.id}
-        logoUrl="/path/to/your/logo.png" // Update this path
-      />
-    );
+    return <PVReportPrint data={printData} reportId={reportId} />;
   }
 
   return (
