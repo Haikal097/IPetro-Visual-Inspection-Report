@@ -37,8 +37,8 @@ const inspectorNav: NavItem[] = [
 
 const reviewerNav: NavItem[] = [
   { title: 'Dashboard', href: '/review', icon: LayoutGrid },
-  { title: 'Approved Report', href: '/approvedreport', icon: CircleCheckBig },
-  { title: 'Rejected Report', href: '/rejectedreport', icon: CircleX },
+  { title: 'Approved Report', href: '/reviewapproved', icon: CircleCheckBig },
+  { title: 'Rejected Report', href: '/reviewrejected', icon: CircleX },
 ];
 
 const adminNav: NavItem[] = [

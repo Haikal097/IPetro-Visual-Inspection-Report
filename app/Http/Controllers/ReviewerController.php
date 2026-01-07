@@ -163,6 +163,258 @@ class ReviewerController extends Controller
         ]);
     }
 
+    public function approvedPage(Request $request)
+    {
+        $query = Report::query();
+
+        // Only get approved reports
+        $query->where('status', 'approved');
+
+        $query->orderBy('updated_at', 'desc')
+            ->orderBy('created_at', 'desc');
+
+        $reports = $query->get()->map(function ($report) {
+            $jsonData = [];
+            if ($report->json_data) {
+                try {
+                    $jsonData = is_string($report->json_data)
+                        ? json_decode($report->json_data, true)
+                        : $report->json_data;
+                } catch (\Exception $e) {
+                    $jsonData = [];
+                }
+            }
+
+            $photoReports = PhotoReport::where('report_id', $report->getKey())->get();
+
+            $allPhotoItems = [];
+            foreach ($photoReports as $photoReport) {
+                if ($photoReport->report_data) {
+                    try {
+                        $photoData = is_string($photoReport->report_data)
+                            ? json_decode($photoReport->report_data, true)
+                            : $photoReport->report_data;
+
+                        if (!empty($photoData['items'])) {
+                            $allPhotoItems = array_merge($allPhotoItems, $photoData['items']);
+                        }
+                    } catch (\Exception $e) {
+                        // Skip invalid JSON
+                    }
+                }
+            }
+
+            $attachmentsCount = count(array_filter($allPhotoItems, function ($item) {
+                return !empty($item['image']);
+            }));
+
+            $title = $report->title ?? $jsonData['title'] ?? 'Untitled Report';
+            $inspectorName = $jsonData['inspectorName'] ?? 'Unknown Inspector';
+            $equipmentType = $jsonData['equipmentType'] ?? $jsonData['equipmentDescription'] ?? 'Unknown Equipment';
+            $equipmentTag = $jsonData['equipmentTag'] ?? 'N/A';
+            $inspectorRole = $jsonData['inspectorRole'] ?? 'Inspector';
+
+            $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->getKey();
+
+            $inspectionDate =
+                $jsonData['reportDate']
+                ?? ($report->creation_date ? Carbon::parse($report->creation_date)->format('Y-m-d') : null)
+                ?? ($report->created_at ? Carbon::parse($report->created_at)->format('Y-m-d') : null);
+
+            $statusMap = [
+                'submitted' => 'pending',
+                'in_review' => 'in-review',
+                'revisions_requested' => 'revisions-requested',
+                'approved' => 'approved',
+                'rejected' => 'rejected',
+            ];
+            $status = $statusMap[$report->status] ?? 'pending';
+
+            $submissionDate = $report->submission_date ?? $report->created_at;
+
+            return [
+                'id' => $report->getKey(),
+                'report_id' => $report->getKey(),
+                'report_number' => $reportNumber,
+                'title' => $title,
+                'json_data' => $jsonData,
+                'submission_date' => $submissionDate?->format('Y-m-d H:i:s') ?? $report->created_at->format('Y-m-d H:i:s'),
+                'inspection_date' => $inspectionDate,
+                'status' => $status,
+                'db_status' => $report->status,
+
+                'created_at' => $report->created_at->format('Y-m-d H:i:s'),
+                'updated_at' => $report->updated_at->format('Y-m-d H:i:s'),
+
+                'inspector_name' => $inspectorName,
+                'inspector_role' => $inspectorRole,
+                'equipment' => $equipmentType,
+                'equipment_tag' => $equipmentTag,
+
+                'pmt' => $jsonData['pmt'] ?? null,
+                'plant_unit' => $jsonData['plantUnitArea'] ?? $jsonData['plantUnit'] ?? null,
+                'description' => $jsonData['description'] ?? null,
+
+                'attachments' => $attachmentsCount,
+                'has_photo_report' => $photoReports->count() > 0,
+                'photo_report_id' => $photoReports->first()->id ?? null,
+
+                'reviewer_id' => $report->reviewer_id,
+                'creator_id' => $report->creator_id,
+                'inspector_id' => $report->inspector_id,
+            ];
+    });
+
+    // Get stats for approved reports
+    $totalApproved = $reports->count();
+    $approvedToday = Report::whereDate('updated_at', today())
+        ->where('status', 'approved')
+        ->count();
+
+    // Calculate approval rate for approved reports page (optional)
+    $totalReports = Report::count();
+    $approvalRate = $totalReports > 0 ? round(($totalApproved / $totalReports) * 100, 1) : 0;
+
+    return Inertia::render('Reviewer/ApprovedReport', [
+        'reviews' => $reports,
+        'stats' => [
+            'total_pending' => 0,
+            'in_review' => 0,
+            'revisions_needed' => 0,
+            'completed_today' => $approvedToday,
+            'avg_review_time' => '0h',
+            'approval_rate' => $approvalRate . '%',
+            'overdue_reviews' => 0,
+            'total_reviews' => $totalApproved,
+        ],
+        'filters' => $request->only(['search', 'status', 'timeframe']),
+    ]);
+    }
+
+    public function rejectedPage(Request $request)
+    {
+        $query = Report::query();
+
+        // Only get rejected reports
+        $query->where('status', 'rejected');
+
+        $query->orderBy('updated_at', 'desc')
+            ->orderBy('created_at', 'desc');
+
+        $reports = $query->get()->map(function ($report) {
+            $jsonData = [];
+            if ($report->json_data) {
+                try {
+                    $jsonData = is_string($report->json_data)
+                        ? json_decode($report->json_data, true)
+                        : $report->json_data;
+                } catch (\Exception $e) {
+                    $jsonData = [];
+                }
+            }
+
+            $photoReports = PhotoReport::where('report_id', $report->getKey())->get();
+
+            $allPhotoItems = [];
+            foreach ($photoReports as $photoReport) {
+                if ($photoReport->report_data) {
+                    try {
+                        $photoData = is_string($photoReport->report_data)
+                            ? json_decode($photoReport->report_data, true)
+                            : $photoReport->report_data;
+
+                        if (!empty($photoData['items'])) {
+                            $allPhotoItems = array_merge($allPhotoItems, $photoData['items']);
+                        }
+                    } catch (\Exception $e) {
+                        // Skip invalid JSON
+                    }
+                }
+            }
+
+            $attachmentsCount = count(array_filter($allPhotoItems, function ($item) {
+                return !empty($item['image']);
+            }));
+
+            $title = $report->title ?? $jsonData['title'] ?? 'Untitled Report';
+            $inspectorName = $jsonData['inspectorName'] ?? 'Unknown Inspector';
+            $equipmentType = $jsonData['equipmentType'] ?? $jsonData['equipmentDescription'] ?? 'Unknown Equipment';
+            $equipmentTag = $jsonData['equipmentTag'] ?? 'N/A';
+            $inspectorRole = $jsonData['inspectorRole'] ?? 'Inspector';
+
+            $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->getKey();
+
+            $inspectionDate =
+                $jsonData['reportDate']
+                ?? ($report->creation_date ? Carbon::parse($report->creation_date)->format('Y-m-d') : null)
+                ?? ($report->created_at ? Carbon::parse($report->created_at)->format('Y-m-d') : null);
+
+            $statusMap = [
+                'submitted' => 'pending',
+                'in_review' => 'in-review',
+                'revisions_requested' => 'revisions-requested',
+                'approved' => 'approved',
+                'rejected' => 'rejected',
+            ];
+            $status = $statusMap[$report->status] ?? 'pending';
+
+            $submissionDate = $report->submission_date ?? $report->created_at;
+
+            return [
+                'id' => $report->getKey(),
+                'report_id' => $report->getKey(),
+                'report_number' => $reportNumber,
+                'title' => $title,
+                'json_data' => $jsonData,
+                'submission_date' => $submissionDate?->format('Y-m-d H:i:s') ?? $report->created_at->format('Y-m-d H:i:s'),
+                'inspection_date' => $inspectionDate,
+                'status' => $status,
+                'db_status' => $report->status,
+
+                'created_at' => $report->created_at->format('Y-m-d H:i:s'),
+                'updated_at' => $report->updated_at->format('Y-m-d H:i:s'),
+
+                'inspector_name' => $inspectorName,
+                'inspector_role' => $inspectorRole,
+                'equipment' => $equipmentType,
+                'equipment_tag' => $equipmentTag,
+
+                'pmt' => $jsonData['pmt'] ?? null,
+                'plant_unit' => $jsonData['plantUnitArea'] ?? $jsonData['plantUnit'] ?? null,
+                'description' => $jsonData['description'] ?? null,
+
+                'attachments' => $attachmentsCount,
+                'has_photo_report' => $photoReports->count() > 0,
+                'photo_report_id' => $photoReports->first()->id ?? null,
+
+                'reviewer_id' => $report->reviewer_id,
+                'creator_id' => $report->creator_id,
+                'inspector_id' => $report->inspector_id,
+            ];
+        });
+
+        // Get stats for rejected reports
+        $totalRejected = $reports->count();
+        $rejectedToday = Report::whereDate('updated_at', today())
+            ->where('status', 'rejected')
+            ->count();
+
+        return Inertia::render('Reviewer/RejectedReport', [
+            'reviews' => $reports,
+            'stats' => [
+                'total_pending' => 0,
+                'in_review' => 0,
+                'revisions_needed' => 0,
+                'completed_today' => $rejectedToday,
+                'avg_review_time' => '0h',
+                'approval_rate' => '0%',
+                'overdue_reviews' => 0,
+                'total_reviews' => $totalRejected,
+            ],
+            'filters' => $request->only(['search', 'status', 'timeframe']),
+        ]);
+    }
+
     private function calculateAverageReviewTime(): string
     {
         $approvedReports = Report::where('status', 'approved')

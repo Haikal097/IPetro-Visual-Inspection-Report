@@ -452,22 +452,6 @@ export default function ApprovedReports({ reviews, stats, filters }: Props) {
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                         Showing {filteredReviews.length} of {approvedReviewItems.length} approved reports
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={handleRefresh}
-                            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                            <RefreshCw className="h-4 w-4" />
-                            Refresh List
-                        </button>
-                        <Link
-                            href="/review"
-                            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                            <FileText className="h-4 w-4" />
-                            Back to Review Dashboard
-                        </Link>
-                    </div>
                 </div>
             </div>
         </AppLayout>

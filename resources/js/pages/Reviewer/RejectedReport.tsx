@@ -430,13 +430,14 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
                                                         <Eye className="h-4 w-4" />
                                                         View Details
                                                     </Link>
+                                                    {/* Restore Button (UNUSED)
                                                     <button
                                                         onClick={() => handleRestoreReview(item.dbId)}
                                                         className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 px-3 py-1.5 text-sm font-medium text-rose-700 dark:text-rose-300 transition-colors hover:bg-rose-100 dark:hover:bg-rose-900/40"
                                                     >
                                                         <RefreshCw className="h-4 w-4" />
                                                         Restore
-                                                    </button>
+                                                    </button> */}
                                                 </div>
                                             </td>
                                         </tr>
@@ -471,22 +472,6 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                         Showing {filteredReviews.length} of {rejectedReviewItems.length} rejected reports
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={handleRefresh}
-                            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                            <RefreshCw className="h-4 w-4" />
-                            Refresh List
-                        </button>
-                        <Link
-                            href="/review"
-                            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                            <FileText className="h-4 w-4" />
-                            Back to Review Dashboard
-                        </Link>
                     </div>
                 </div>
             </div>

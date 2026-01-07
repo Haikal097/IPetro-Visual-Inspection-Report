@@ -264,6 +264,9 @@ class PhotoReportController extends Controller
                 ], 400);
             }
 
+            // Get current timestamp for updatedAt
+            $currentTimestamp = now();
+
             $photoReportData = [
                 'report_id' => $reportId,
                 'report_title' => $request->report_title,
@@ -274,7 +277,36 @@ class PhotoReportController extends Controller
                 'description' => $request->description,
                 'plant_unit' => $request->plant_unit,
                 'report_data' => $request->report_data,
+                'updated_at' => $currentTimestamp, // Add updatedAt timestamp
             ];
+
+            // If this is an update (not a new submission), add last_updated_by
+            $existingPhotoReport = PhotoReport::where('report_id', $reportId)->first();
+            if ($existingPhotoReport) {
+                $photoReportData['last_updated_by'] = Auth::id() ?? null;
+                $photoReportData['last_updated_at'] = $currentTimestamp;
+                $photoReportData['update_count'] = ($existingPhotoReport->update_count ?? 0) + 1;
+                
+                // Store previous version data for audit trail
+                $previousData = $existingPhotoReport->only([
+                    'report_title', 'report_number', 'inspection_date', 'pmt', 
+                    'tag', 'description', 'plant_unit', 'report_data'
+                ]);
+                
+                // Save previous version if needed (you might have an audit table)
+                // PhotoReportAudit::create([
+                //     'photo_report_id' => $existingPhotoReport->id,
+                //     'previous_data' => $previousData,
+                //     'updated_by' => Auth::id(),
+                //     'updated_at' => $currentTimestamp,
+                // ]);
+                
+                Log::info('Updating existing photo report for report_id: ' . $reportId, [
+                    'previous_data' => $previousData,
+                    'new_data' => $photoReportData,
+                    'update_count' => $photoReportData['update_count']
+                ]);
+            }
 
             Log::info('Photo report data prepared for submission', $photoReportData);
 
@@ -283,38 +315,60 @@ class PhotoReportController extends Controller
                 $photoReportData
             );
 
+            // If it was a create, set initial metadata
+            if (!$existingPhotoReport) {
+                $photoReport->update([
+                    'created_by' => Auth::id() ?? null,
+                    'created_at' => $currentTimestamp,
+                    'submitted_at' => $currentTimestamp,
+                    'submitted_by' => Auth::id() ?? null,
+                ]);
+            }
+
             Log::info('Photo report ' . ($photoReport->wasRecentlyCreated ? 'created' : 'updated') . ' with ID: ' . $photoReport->id);
 
             $report->update([
                 'status' => 'submitted',
-                'submitted_at' => now(),
+                'submitted_at' => $currentTimestamp,
                 'has_photo_report' => true,
                 'photo_report_id' => $photoReport->id,
                 'submitted_by' => Auth::id() ?? null,
+                'updated_at' => $currentTimestamp, // Update main report's updatedAt
             ]);
 
-            Log::info('Main report status updated to submitted for report_id: ' . $reportId);
+            // Log detailed update information
+            Log::info('Main report status updated to submitted for report_id: ' . $reportId, [
+                'status_change' => 'draft -> submitted',
+                'updated_at' => $currentTimestamp->toDateTimeString(),
+                'updated_by' => Auth::id(),
+                'photo_report_id' => $photoReport->id,
+                'has_photo_report' => true,
+            ]);
 
             // ✅ SEND NOTIFICATION (after submit)
             $actor = Auth::user();
 
             if ($actor) {
                 $actor->notify(new ReportSubmitted($report, $actor));
-                Log::info("Notification sent to actor: user_id={$actor->id}, report_id={$reportId}");
+                Log::info("Notification sent to actor: user_id={$actor->id}, report_id={$reportId}, timestamp={$currentTimestamp}");
             }
 
             if ($report->creator) {
                 $report->creator->notify(new ReportSubmitted($report, $actor));
-                Log::info("Notification sent to creator: user_id={$report->creator->id}, report_id={$reportId}");
+                Log::info("Notification sent to creator: user_id={$report->creator->id}, report_id={$reportId}, timestamp={$currentTimestamp}");
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Photo report submitted successfully',
+                'message' => $existingPhotoReport ? 'Photo report updated successfully' : 'Photo report submitted successfully',
                 'data' => [
                     'photo_report' => $photoReport,
                     'photo_report_id' => $photoReport->id,
                     'main_report_status' => 'submitted',
+                    'timestamp' => $currentTimestamp->toDateTimeString(),
+                    'updated_at' => $currentTimestamp->toDateTimeString(),
+                    'is_update' => (bool)$existingPhotoReport,
+                    'update_count' => $photoReport->update_count ?? 1,
                 ],
             ], 200);
 

@@ -490,7 +490,7 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
                                                         <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                                                             <div className="flex items-center gap-1">
                                                                 <Calendar className="h-3.5 w-3.5" />
-                                                                <span>Inspection: {item.inspectionDate}</span>
+                                                                <span>Submitted: {new Date(item.submittedDate).toLocaleDateString('en-GB')} {new Date(item.submittedDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
                                                             </div>
                                                             <div className="flex items-center gap-1">
                                                                 <Clock className="h-3.5 w-3.5" />
