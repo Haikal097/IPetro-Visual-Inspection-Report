@@ -7,6 +7,8 @@ import { Head, usePage, router } from '@inertiajs/react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { Link } from '@inertiajs/react';
+import InspectorChat from "@/components/ai/InspectorChat";
+import ReportAnalysisModal from "@/components/ai/ReportAnalysisModal";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -200,8 +202,8 @@ export default function Dashboard() {
                 return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300`;
             case 'submitted':
                 return `${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300`;
-            case 'in_review':
-                return `${baseClasses} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300`;
+            //case 'in_review':
+            //    return `${baseClasses} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300`;
             case 'approved':
                 return `${baseClasses} bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300`;
             case 'rejected':
@@ -219,8 +221,8 @@ export default function Dashboard() {
                 return 'Draft';
             case 'submitted':
                 return 'Submitted';
-            case 'in_review':
-                return 'In Review';
+            //case 'in_review':
+                //return 'In Review';
             case 'approved':
                 return 'Approved';
             case 'rejected':
@@ -284,6 +286,10 @@ export default function Dashboard() {
         }
     };
 
+    //AI Modals state
+    const [openAnalysis, setOpenAnalysis] = useState(false);
+    const [openChat, setOpenChat] = useState(false);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
@@ -343,19 +349,6 @@ export default function Dashboard() {
                                 <div>
                                     <h3 className="text-3xl font-bold">{stats.pendingReview}</h3>
                                     <p className="text-amber-100">Submitted</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* In Review Card */}
-                        <div className="rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white shadow-lg transition-transform duration-200 hover:scale-[1.02]">
-                            <div className="flex items-center gap-4">
-                                <div className="rounded-lg bg-white/20 p-3 backdrop-blur-sm">
-                                    <span className="text-2xl">👁️</span>
-                                </div>
-                                <div>
-                                    <h3 className="text-3xl font-bold">{stats.inReview}</h3>
-                                    <p className="text-blue-100">In Review</p>
                                 </div>
                             </div>
                         </div>
@@ -562,49 +555,49 @@ export default function Dashboard() {
                                     </svg>
                                 </Link>
 
-                                <Link 
-                                    href="/reports?status=in_review"
+                                {/* ✅ REPLACED: Pending Review link -> AI Data Analysis button */}
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenAnalysis(true)}
                                     className="group flex w-full items-center justify-between rounded-xl border border-amber-200/50 bg-white p-4 transition-all hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md hover:shadow-amber-200/30 dark:border-amber-900/30 dark:bg-gray-800 dark:hover:border-amber-800 dark:hover:bg-amber-900/20 dark:hover:shadow-amber-900/20"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 text-white group-hover:from-amber-600 group-hover:to-amber-700 transition-all">
-                                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                            </svg>
+                                            <span className="text-base">📈</span>
                                         </div>
-                                        <div>
-                                            <h4 className="font-semibold text-gray-900 dark:text-white">Pending Review ({stats.inReview + stats.pendingReview})</h4>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">Review pending reports</p>
+                                        <div className="text-left">
+                                            <h4 className="font-semibold text-gray-900 dark:text-white">AI Data Analysis</h4>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Insights & recommendations</p>
                                         </div>
                                     </div>
                                     <svg className="h-5 w-5 text-gray-400 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
-                                </Link>
+                                </button>
 
-                                <Link 
-                                    href="/export"
+                                {/* ✅ REPLACED: Export link -> Inspector AI Chat button */}
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenChat(true)}
                                     className="group flex w-full items-center justify-between rounded-xl border border-emerald-200/50 bg-white p-4 transition-all hover:border-emerald-300 hover:bg-emerald-50/50 hover:shadow-md hover:shadow-emerald-200/30 dark:border-emerald-900/30 dark:bg-gray-800 dark:hover:border-emerald-800 dark:hover:bg-emerald-900/20 dark:hover:shadow-emerald-900/20"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white group-hover:from-emerald-600 group-hover:to-emerald-700 transition-all">
-                                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                            </svg>
+                                            <span className="text-base">🤖</span>
                                         </div>
-                                        <div>
-                                            <h4 className="font-semibold text-gray-900 dark:text-white">Export Data</h4>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">Download reports & metrics</p>
+                                        <div className="text-left">
+                                            <h4 className="font-semibold text-gray-900 dark:text-white">Inspector AI Chat</h4>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Ask anything while reporting</p>
                                         </div>
                                     </div>
                                     <svg className="h-5 w-5 text-gray-400 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
-                                </Link>
+                                </button>
                             </div>
                             
                             {/* Help text */}
-                            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                            {/*<div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
                                 <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
                                     <div className="flex items-start gap-2">
                                         <svg className="mt-0.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -615,7 +608,7 @@ export default function Dashboard() {
                                         </p>
                                     </div>
                                 </div>
-                            </div>
+                            </div>*/}
                         </div>
                     </div>
                 </div>
@@ -731,6 +724,22 @@ export default function Dashboard() {
                         </div>
                     )}
                 </div>
+
+                {/* ✅ AI Components (added only) */}
+                <ReportAnalysisModal
+                    open={openAnalysis}
+                    onClose={() => setOpenAnalysis(false)}
+                    reports={reports}
+                />
+
+                <InspectorChat
+                    open={openChat}
+                    onClose={() => setOpenChat(false)}
+                    context={{
+                        stats,
+                        chartFilter,
+                    }}
+                />
             </div>
         </AppLayout>
     );
