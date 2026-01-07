@@ -18,6 +18,9 @@ use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\Api\PhotoReportController;
 use App\Http\Controllers\AiReportDraftController;
 use App\Http\Controllers\Api\EquipmentTemplateController;
+use App\Http\Controllers\Api\InspectorAiController;
+use App\Http\Controllers\AiInspectorChatController;
+use App\Http\Controllers\Api\AiDashboardAnalysisController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -270,10 +273,21 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
     Route::post('/reports/{id}/submit', [ReportController::class, 'submit']);
     Route::post('/reports/{id}/approve', [ReportController::class, 'approve']);
 
-    // ai
+    // ai draft
     Route::post('/ai/pv-report-draft', [AiReportDraftController::class, 'generatePv'])
-        ->middleware(['auth'])
         ->name('ai.pv-report-draft.generate.web');
+
+    // inspector chat (choose one controller)
+    Route::post('/ai/inspector-chat', [InspectorAiController::class, 'chat'])
+        ->name('ai.inspector.chat');
+
+    // report analysis
+    Route::post('/ai/report-analysis', [InspectorAiController::class, 'analyze'])
+        ->name('ai.report.analysis');
+
+    // dashboard analysis (use invoke controller)
+    Route::post('/ai/dashboard-analysis', AiDashboardAnalysisController::class)
+        ->name('ai.dashboard-analysis');
 
     /*
     |----------------------------------------------------------------------
