@@ -42,77 +42,84 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Photos
+    | Photos (Inspector Only)
     |--------------------------------------------------------------------------
     */
-    Route::get('/photo', [PhotoController::class, 'index'])->name('photo.index');
-    Route::post('/upload', [PhotoController::class, 'store'])->name('upload');
-    Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage'])->name('save.edited.image');
-    Route::delete('/upload', [PhotoController::class, 'destroy'])->name('upload.destroy');
+    Route::middleware(['auth', 'role:inspector'])->group(function () {
+        Route::get('/photo', [PhotoController::class, 'index'])->name('photo.index');
+        Route::post('/upload', [PhotoController::class, 'store'])->name('upload');
+        Route::post('/save-edited-image', [PhotoController::class, 'saveEditedImage'])->name('save.edited.image');
+        Route::delete('/upload', [PhotoController::class, 'destroy'])->name('upload.destroy');
 
-    Route::get('/photos/temp/{filename}', [PhotoController::class, 'getTempUrl'])->name('photos.temp-url');
-    Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
+        Route::get('/photos/temp/{filename}', [PhotoController::class, 'getTempUrl'])->name('photos.temp-url');
+        Route::get('/photos/all', [PhotoController::class, 'getAllPhotos'])->name('photos.all');
 
-    Route::put('/photos/{photo}', [PhotoController::class, 'update'])->name('photos.update');
-    Route::delete('/photos/{photo}', [PhotoController::class, 'destroy'])->name('photos.destroy');
+        Route::put('/photos/{photo}', [PhotoController::class, 'update'])->name('photos.update');
+        Route::delete('/photos/{photo}', [PhotoController::class, 'destroy'])->name('photos.destroy');
+    });
 
     /*
     |--------------------------------------------------------------------------
-    | Reports (Inspector)
+    | Reports (Inspector Only)
     |--------------------------------------------------------------------------
     */
-    Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
+    Route::middleware(['auth', 'role:inspector'])->group(function () {
+        Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
 
-    // ✅ FIX (necessary): /report previously rendered page without props (causes buttons to feel broken)
-    // Keep route for backward compatibility but redirect to correct page
-    Route::get('/report', function () {
-        return redirect('/reports');
-    })->name('reports.inspector.index');
+        // ✅ FIX (necessary): /report previously rendered page without props (causes buttons to feel broken)
+        // Keep route for backward compatibility but redirect to correct page
+        Route::get('/report', function () {
+            return redirect('/reports');
+        })->name('reports.inspector.index');
 
-    // ✅ Correct inspector reports list with props
-    Route::get('/reports', [ReportController::class, 'reportsPage'])->name('reports.page');
+        // ✅ Correct inspector reports list with props
+        Route::get('/reports', [ReportController::class, 'reportsPage'])->name('reports.page');
 
-    // ✅ Inspector Resubmit (should be accessible to inspector, not inside reviewer-only group)
-    Route::post('/reports/{report}/resubmit', [ReportController::class, 'resubmit'])->name('reports.resubmit');
+        // ✅ Inspector Resubmit (should be accessible to inspector, not inside reviewer-only group)
+        Route::post('/reports/{report}/resubmit', [ReportController::class, 'resubmit'])->name('reports.resubmit');
 
-    // Create new PV report
-    Route::get('/pv-report', function () {
-        return Inertia::render('Reports/PVReport', [
-            'reportId' => null,
-        ]);
-    })->name('pv-report.create');
+        // Create new PV report
+        Route::get('/pv-report', function () {
+            return Inertia::render('Reports/PVReport', [
+                'reportId' => null,
+            ]);
+        })->name('pv-report.create');
 
-    // Edit existing PV report
-    Route::get('/pv-report/{report}', function ($report) {
-        return Inertia::render('Reports/PVReport', [
-            'reportId' => $report,
-        ]);
-    })->name('pv-report.edit');
+        // Edit existing PV report
+        Route::get('/pv-report/{report}', function ($report) {
+            return Inertia::render('Reports/PVReport', [
+                'reportId' => $report,
+            ]);
+        })->name('pv-report.edit');
+    });
 
     /*
     |--------------------------------------------------------------------------
-    | ✅ Equipment Templates (Inertia Page)
+    | ✅ Equipment Templates (Inertia Page) - Inspector Only
     |--------------------------------------------------------------------------
     */
-    Route::get('/equipment-templates', function () {
-        return Inertia::render('EquipmentTemplates/Index');
-    })->name('equipment-templates.index');
+    Route::middleware(['auth', 'role:inspector'])->group(function () {
+        Route::get('/equipment-templates', function () {
+            return Inertia::render('EquipmentTemplates/Index');
+        })->name('equipment-templates.index');
+    });
 
     /*
     |--------------------------------------------------------------------------
-    | Inspection Calendar
+    | Inspection Calendar - Inspector Only
     |--------------------------------------------------------------------------
     */
-    Route::get('/inspection-calendar', [InspectionCalendarController::class, 'index'])->name('inspection.calendar');
-    Route::get('/inspection-calendar/events', [InspectionCalendarController::class, 'events'])->name('inspection.calendar.events');
-    Route::post('/inspection-calendar', [InspectionCalendarController::class, 'store'])->name('inspection.calendar.store');
-    Route::put('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'update'])->name('inspection.calendar.update');
-    Route::delete('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'destroy'])->name('inspection.calendar.destroy');
+    Route::middleware(['auth', 'role:inspector'])->group(function () {
+        Route::get('/inspection-calendar', [InspectionCalendarController::class, 'index'])->name('inspection.calendar');
+        Route::get('/inspection-calendar/events', [InspectionCalendarController::class, 'events'])->name('inspection.calendar.events');
+        Route::post('/inspection-calendar', [InspectionCalendarController::class, 'store'])->name('inspection.calendar.store');
+        Route::put('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'update'])->name('inspection.calendar.update');
+        Route::delete('/inspection-calendar/{inspection}', [InspectionCalendarController::class, 'destroy'])->name('inspection.calendar.destroy');
 
-    Route::get('/calendar', function () {
-        return Inertia::render('calendar/InspectionCalendar');
-    })->name('calendar');
-
+        Route::get('/calendar', function () {
+            return Inertia::render('calendar/InspectionCalendar');
+        })->name('calendar');
+    });
     /*
     |--------------------------------------------------------------------------
     | Notifications
@@ -181,17 +188,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Reviewer Pages
+    | Reviewer Pages (Reviewer Only)
     |--------------------------------------------------------------------------
     */
-    // ✅ keep ONE review index route
-    Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
+    Route::middleware(['auth', 'role:reviewer'])->group(function () {
+        // ✅ keep ONE review index route
+        Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
 
-    Route::get('/reviewer/report', function () {
-        return Inertia::render('Reviewer/Report');
-    })->name('reviewer.report');
+        Route::get('/reviewer/report', function () {
+            return Inertia::render('Reviewer/Report');
+        })->name('reviewer.report');
 
-    Route::middleware(['auth'])->group(function () {
         Route::get('/review/report/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
 
         Route::get('/reports/{report}/compare', [ReviewerController::class, 'compare'])->name('reports.compare');
