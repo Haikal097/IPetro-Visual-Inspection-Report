@@ -10,6 +10,11 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
+// ✅ ADDED: notifications
+use App\Notifications\ReportApproved;
+use App\Notifications\ReportRejected;
+use App\Notifications\ReportRevisionRequested;
+
 class ReviewerController extends Controller
 {
     public function indexReviewer(Request $request)
@@ -321,7 +326,7 @@ class ReviewerController extends Controller
         $report->update([
             'status' => 'approved',
             'reviewer_id' => Auth::id(),
-            'signed_at' => now(),
+            'signed_at' => now(), // ⚠️ NOTE: keep as-is (you asked “don’t change”), but ideally use approved_at/reviewed_at instead
         ]);
 
         ReportReviewLog::create([
@@ -330,6 +335,10 @@ class ReviewerController extends Controller
             'action' => 'approved',
             'message' => null,
         ]);
+
+        // ✅ ADDED: send notification to inspector/creator
+        $report->loadMissing('creator');
+        $report->creator?->notify(new ReportApproved($report, Auth::user()));
 
         return back()->with('success', 'Report approved.');
     }
@@ -356,6 +365,10 @@ class ReviewerController extends Controller
             'message' => $request->message,
         ]);
 
+        // ✅ ADDED: send notification to inspector/creator
+        $report->loadMissing('creator');
+        $report->creator?->notify(new ReportRejected($report, $request->message, Auth::user()));
+
         return back()->with('success', 'Report rejected.');
     }
 
@@ -380,6 +393,10 @@ class ReviewerController extends Controller
             'action' => 'revisions_requested',
             'message' => $request->message,
         ]);
+
+        // ✅ ADDED: send notification to inspector/creator
+        $report->loadMissing('creator');
+        $report->creator?->notify(new ReportRevisionRequested($report, $request->message, Auth::user()));
 
         return back()->with('success', 'Revision requested.');
     }
