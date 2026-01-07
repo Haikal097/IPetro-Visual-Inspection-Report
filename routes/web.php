@@ -176,6 +176,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('reports.photo-report.update');
     Route::delete('/reports/{reportId}/photo-report', [PhotoReportController::class, 'deletePhotoReport'])
         ->name('reports.photo-report.delete');
+    Route::post('/reports/{reportId}/photo-report/submit', [PhotoReportController::class, 'submitPhotoReport'])
+        ->name('reports.photo-report.submit');
 
     /*
     |--------------------------------------------------------------------------
