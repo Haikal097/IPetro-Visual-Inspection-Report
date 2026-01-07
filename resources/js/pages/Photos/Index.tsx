@@ -272,18 +272,20 @@ export default function Index() {
         <div className="flex gap-6">
           {/* MAIN */}
           <div className="flex-1">
-            <h1 className="text-2xl font-bold mb-2">Upload and Edit Photos</h1>
-            <p className="text-sm text-gray-500 mb-4">
-              Viewing: <span className="font-semibold">{activeTitle}</span>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Upload and Edit Photos</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Viewing: <span className="font-semibold text-gray-900 dark:text-white">{activeTitle}</span>
             </p>
 
             {/* TOP BAR */}
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              {/* ✅ “All Photos” = Unsorted only */}
+              {/* ✅ "All Photos" = Unsorted only */}
               <button
                 type="button"
-                className={`border rounded px-3 py-2 text-sm ${
-                  activeAlbumId === 'all' ? 'bg-gray-100 font-semibold' : ''
+                className={`border border-gray-300 dark:border-gray-700 rounded px-3 py-2 text-sm ${
+                  activeAlbumId === 'all' 
+                    ? 'bg-gray-100 dark:bg-gray-800 font-semibold text-gray-900 dark:text-white' 
+                    : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => setActiveAlbumId('all')}
               >
@@ -292,7 +294,7 @@ export default function Index() {
 
               {/* sort */}
               <select
-                className="border rounded px-3 py-2 text-sm"
+                className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded px-3 py-2 text-sm"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
               >
@@ -303,7 +305,7 @@ export default function Index() {
 
               <button
                 type="button"
-                className="border rounded px-3 py-2 text-sm"
+                className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
               >
                 {sortDir === 'asc' ? 'Asc' : 'Desc'}
@@ -311,7 +313,7 @@ export default function Index() {
 
               {/* search */}
               <input
-                className="border rounded px-3 py-2 text-sm w-56"
+                className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-white rounded px-3 py-2 text-sm w-56"
                 placeholder="Search file name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -321,7 +323,7 @@ export default function Index() {
               />
               <button
                 type="button"
-                className="border rounded px-3 py-2 text-sm"
+                className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={() => fetchPhotos()}
               >
                 Search
@@ -330,7 +332,7 @@ export default function Index() {
               {/* create folder */}
               <button
                 type="button"
-                className="ml-auto bg-[#CD202C] text-white rounded px-4 py-2 text-sm font-semibold"
+                className="ml-auto bg-[#CD202C] text-white rounded px-4 py-2 text-sm font-semibold hover:bg-[#b81b27]"
                 onClick={async () => {
                   const name = prompt('Folder name?');
                   if (!name) return;
@@ -385,8 +387,8 @@ export default function Index() {
 
             {/* Saved image preview */}
             {savedImageUrl && (
-              <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                <h3 className="text-lg font-semibold mb-2 text-green-800">✅ Image Saved!</h3>
+              <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800/30">
+                <h3 className="text-lg font-semibold mb-2 text-green-800 dark:text-green-300">✅ Image Saved!</h3>
                 <img
                   src={savedImageUrl}
                   alt="Saved edited"
@@ -397,7 +399,7 @@ export default function Index() {
                     href={savedImageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 underline"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
                   >
                     Open image in new tab
                   </a>
@@ -408,10 +410,13 @@ export default function Index() {
             {/* IMAGE EDITOR MODAL */}
             {isImgEditorShown && uploadedImageUrl && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg w-full max-w-6xl h-[90vh]">
-                  <div className="flex justify-between items-center p-4 border-b">
-                    <h2 className="text-xl font-semibold">Edit Image</h2>
-                    <button onClick={closeImgEditor} className="text-gray-500 hover:text-gray-700">
+                <div className="bg-white dark:bg-gray-900 rounded-lg w-full max-w-6xl h-[90vh]">
+                  <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Image</h2>
+                    <button 
+                      onClick={closeImgEditor} 
+                      className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
                       Close
                     </button>
                   </div>
@@ -456,18 +461,18 @@ export default function Index() {
 
                     {/* overlay buttons */}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-2 p-2">
-                      {/* move dropdown still allowed */}
+                      {/* move dropdown */}
                       <select
-                        className="text-xs rounded px-2 py-1 w-full max-w-[160px]"
+                        className="text-xs rounded px-2 py-1 w-full max-w-[160px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700"
                         value={photo.album_id ?? ''}
                         onChange={async (e) => {
                           const album_id = e.target.value === '' ? null : Number(e.target.value);
                           await movePhotoToAlbum(photo.id, album_id);
                         }}
                       >
-                        <option value="">Unsorted</option>
+                        <option value="" className="text-gray-900 dark:text-gray-100">Unsorted</option>
                         {albums.map((a) => (
-                          <option key={a.id} value={a.id}>
+                          <option key={a.id} value={a.id} className="text-gray-900 dark:text-gray-100">
                             {a.name}
                           </option>
                         ))}
@@ -478,14 +483,14 @@ export default function Index() {
                           <button
                             type="button"
                             onClick={() => returnToReport(fixedUrl)}
-                            className="px-3 py-1 rounded bg-white text-black text-xs font-semibold"
+                            className="px-3 py-1 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
                           >
                             Use
                           </button>
                           <button
                             type="button"
                             onClick={() => openImgEditor(fixedUrl)}
-                            className="px-3 py-1 rounded bg-[#CD202C] text-white text-xs font-semibold"
+                            className="px-3 py-1 rounded bg-[#CD202C] text-white text-xs font-semibold hover:bg-[#b81b27]"
                           >
                             Edit
                           </button>
@@ -494,7 +499,7 @@ export default function Index() {
                         <button
                           type="button"
                           onClick={() => openImgEditor(fixedUrl)}
-                          className="px-3 py-1 rounded bg-white text-black text-xs font-semibold"
+                          className="px-3 py-1 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
                           Edit
                         </button>
@@ -513,12 +518,14 @@ export default function Index() {
           {/* RIGHT SIDEBAR: FOLDERS */}
           <aside className="w-[280px] shrink-0">
             <div className="sticky top-6">
-              <h3 className="text-sm font-semibold mb-2">Folders</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Folders</h3>
 
               {/* UNSORTED DROP ZONE */}
               <div
                 className={`border rounded-lg p-3 mb-3 cursor-pointer select-none ${
-                  dropHoverAlbum === 'unsorted' ? 'bg-red-50 border-[#CD202C]' : 'bg-white'
+                  dropHoverAlbum === 'unsorted' 
+                    ? 'bg-red-50 dark:bg-red-900/20 border-[#CD202C]' 
+                    : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700'
                 }`}
                 onClick={() => setActiveAlbumId('all')}
                 onDragOver={(e) => onDragOverFolder(e, 'unsorted')}
@@ -527,11 +534,11 @@ export default function Index() {
                 title="Drop photo here to make it Unsorted"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Unsorted (All Photos)</span>
-                  <span className="text-xs text-gray-500">drop here</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Unsorted (All Photos)</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">drop here</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Photos here show in “All Photos”.
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Photos here show in "All Photos".
                 </p>
               </div>
 
@@ -541,8 +548,10 @@ export default function Index() {
                   <div
                     key={a.id}
                     className={`border rounded-lg p-3 cursor-pointer select-none ${
-                      activeAlbumId === a.id ? 'bg-gray-50 border-gray-400' : 'bg-white'
-                    } ${dropHoverAlbum === a.id ? 'bg-red-50 border-[#CD202C]' : ''}`}
+                      activeAlbumId === a.id 
+                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-400 dark:border-gray-600' 
+                        : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700'
+                    } ${dropHoverAlbum === a.id ? 'bg-red-50 dark:bg-red-900/20 border-[#CD202C]' : ''}`}
                     onClick={() => setActiveAlbumId(a.id)}
                     onDragOver={(e) => onDragOverFolder(e, a.id)}
                     onDragLeave={() => setDropHoverAlbum(null)}
@@ -550,14 +559,14 @@ export default function Index() {
                     title="Drop photo here"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium truncate">{a.name}</span>
-                      <span className="text-xs text-gray-500">drop</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{a.name}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">drop</span>
                     </div>
 
                     {/* optional rename */}
                     <button
                       type="button"
-                      className="mt-2 text-xs text-blue-600 hover:underline"
+                      className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
                       onClick={async (e) => {
                         e.stopPropagation();
                         const newName = prompt('Rename folder:', a.name);
@@ -586,8 +595,8 @@ export default function Index() {
                 ))}
 
                 {albums.length === 0 && (
-                  <div className="text-xs text-gray-500 border rounded-lg p-3 bg-white">
-                    No folders yet. Click <b>+ Folder</b> to create one.
+                  <div className="text-xs text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-900">
+                    No folders yet. Click <b className="text-gray-900 dark:text-white">+ Folder</b> to create one.
                   </div>
                 )}
               </div>

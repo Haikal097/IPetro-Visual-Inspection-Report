@@ -258,6 +258,13 @@ class ReviewerController extends Controller
                 'submission_date' => $report->submission_date?->format('Y-m-d H:i:s'),
                 'signed_at' => $report->signed_at?->format('Y-m-d H:i:s'),
 
+                'creator' => $report->creator ? [
+                    'id' => $report->creator->id,
+                    'name' => $report->creator->name,
+                    'email' => $report->creator->email,
+                    'phone' => $report->creator->phone ?? null,
+                ] : null,
+
                 // ===== photo_reports table (rows) =====
                 'photo_reports' => $photoReports->map(function ($pr) {
                     return [

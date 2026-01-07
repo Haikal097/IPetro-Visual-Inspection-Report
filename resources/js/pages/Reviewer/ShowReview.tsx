@@ -173,220 +173,74 @@ export default function ShowReview({ report }: { report: any }) {
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedAttachment, setSelectedAttachment] = useState<number | null>(null);
 
-  // Mock data - replace with API call
   useEffect(() => {
-    const fetchReportData = async () => {
-      // Simulate API call
-      setTimeout(() => {
-        setReportData({
-          id: 75,
-          reportNumber: 'RPT-2025-045',
-          title: 'Pressure Vessel Internal Inspection - V-101',
-          status: 'in_review',
-          priority: 'high',
-          inspector: {
-            id: 101,
-            name: 'Michael Chen',
-            email: 'michael.chen@ipetro.com',
-            phone: '+1 (555) 123-4567',
-            role: 'Senior Inspector',
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Michael'
-          },
-          reviewer: {
-            id: 201,
-            name: 'Sarah Johnson',
-            email: 'sarah.johnson@ipetro.com',
-            phone: '+1 (555) 987-6543',
-            role: 'Lead Reviewer',
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah'
-          },
-          equipment: {
-            type: 'Pressure Vessel',
-            tag: 'V-101',
-            description: 'Primary Process Vessel - Hydrocarbon Service',
-            location: 'Process Area 2, Platform B',
-            plantUnit: 'Crude Distillation Unit',
-            manufacturer: 'ABB Engineering',
-            model: 'PV-5000X',
-            serialNumber: 'ABBE-PV-2023-045',
-            installationDate: '2020-03-15',
-            lastInspectionDate: '2023-12-10'
-          },
-          inspection: {
-            date: '2025-01-20',
-            type: 'Internal Visual Inspection',
-            method: 'Direct Visual (Manned Entry)',
-            temperature: '25°C',
-            pressure: '0 psi (Atmospheric)',
-            humidity: '45% RH',
-            findingsSummary: 'Minor corrosion detected on internal surfaces. Coating intact with minor surface degradation.',
-            recommendations: 'Recommend coating repair within next 6 months. Monitor corrosion progression quarterly.'
-          },
-          dates: {
-            created: '2025-01-18',
-            submitted: '2025-01-20',
-            reviewed: '2025-01-22',
-            approved: '',
-            dueDate: '2025-02-15'
-          },
-          attachments: [
-            {
-              id: 1,
-              name: 'inspection_photos.zip',
-              type: 'image',
-              size: '45.2 MB',
-              uploadedBy: 'Michael Chen',
-              uploadedAt: '2025-01-20 14:30',
-              url: '#'
-            },
-            {
-              id: 2,
-              name: 'pressure_test_report.pdf',
-              type: 'pdf',
-              size: '3.8 MB',
-              uploadedBy: 'Michael Chen',
-              uploadedAt: '2025-01-20 14:35',
-              url: '#'
-            },
-            {
-              id: 3,
-              name: 'corrosion_analysis.xlsx',
-              type: 'spreadsheet',
-              size: '1.2 MB',
-              uploadedBy: 'Michael Chen',
-              uploadedAt: '2025-01-20 14:40',
-              url: '#'
-            },
-            {
-              id: 4,
-              name: 'inspection_video.mp4',
-              type: 'video',
-              size: '125.5 MB',
-              uploadedBy: 'Michael Chen',
-              uploadedAt: '2025-01-20 15:15',
-              url: '#'
-            }
-          ],
-          comments: [
-            {
-              id: 1,
-              user: {
-                id: 201,
-                name: 'Sarah Johnson',
-                role: 'Lead Reviewer',
-                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah'
-              },
-              content: 'Need clarification on corrosion measurements in section 3.2. Please provide exact thickness readings.',
-              timestamp: '2025-01-22 10:15',
-              type: 'question'
-            },
-            {
-              id: 2,
-              user: {
-                id: 101,
-                name: 'Michael Chen',
-                role: 'Senior Inspector',
-                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Michael'
-              },
-              content: 'Updated thickness measurements have been added to the corrosion analysis spreadsheet.',
-              timestamp: '2025-01-22 11:30',
-              type: 'comment'
-            },
-            {
-              id: 3,
-              user: {
-                id: 301,
-                name: 'Robert Williams',
-                role: 'Safety Officer',
-                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Robert'
-              },
-              content: 'Safety clearance verified. All procedures followed correctly.',
-              timestamp: '2025-01-22 13:45',
-              type: 'approval'
-            }
-          ],
-          history: [
-            {
-              id: 1,
-              action: 'Report Created',
-              user: 'Michael Chen',
-              role: 'Inspector',
-              timestamp: '2025-01-18 09:15'
-            },
-            {
-              id: 2,
-              action: 'Report Submitted for Review',
-              user: 'Michael Chen',
-              role: 'Inspector',
-              timestamp: '2025-01-20 14:30'
-            },
-            {
-              id: 3,
-              action: 'Review Started',
-              user: 'Sarah Johnson',
-              role: 'Reviewer',
-              timestamp: '2025-01-22 10:00'
-            },
-            {
-              id: 4,
-              action: 'Comment Added',
-              user: 'Sarah Johnson',
-              role: 'Reviewer',
-              timestamp: '2025-01-22 10:15',
-              details: 'Requested clarification on corrosion measurements'
-            },
-            {
-              id: 5,
-              action: 'Document Updated',
-              user: 'Michael Chen',
-              role: 'Inspector',
-              timestamp: '2025-01-22 11:30'
-            },
-            {
-              id: 6,
-              action: 'Safety Review Completed',
-              user: 'Robert Williams',
-              role: 'Safety Officer',
-              timestamp: '2025-01-22 13:45'
-            }
-          ],
-          metrics: {
-            riskScore: 65,
-            integrityScore: 78,
-            complianceScore: 92,
-            estimatedCost: 12500,
-            estimatedTime: '2-3 weeks'
-          },
-          relatedReports: [
-            {
-              id: 74,
-              reportNumber: 'RPT-2025-044',
-              title: 'Pressure Vessel External Inspection',
-              status: 'approved',
-              date: '2024-12-15'
-            },
-            {
-              id: 73,
-              reportNumber: 'RPT-2025-043',
-              title: 'Pressure Test Results - V-101',
-              status: 'approved',
-              date: '2024-12-10'
-            },
-            {
-              id: 72,
-              reportNumber: 'RPT-2025-042',
-              title: 'Previous Internal Inspection',
-              status: 'closed',
-              date: '2023-12-10'
-            }
-          ]
-        });
-        setIsLoading(false);
-      }, 500);
-    };
+    if (!report) return;
 
-    fetchReportData();
-  }, []);
+    setReportData({
+      id: report.id,
+      reportNumber: report.report_number ?? report.report_data?.reportNo ?? `RPT-${report.id}`,
+      title: report.title ?? report.report_data?.title ?? 'Untitled Report',
+      status: report.status ?? 'draft',
+      priority: 'medium',
+
+      // ✅ inspector follows report creator
+      inspector: {
+        id: report.creator?.id ?? report.creator_id ?? 0,
+        name: report.creator?.name ?? report.report_data?.inspectorName ?? 'Unknown',
+        email: report.creator?.email ?? '',
+        phone: report.creator?.phone ?? '',
+        role: 'Creator / Inspector',
+      },
+
+      equipment: {
+        type: report.report_data?.equipmentType ?? '',
+        tag: report.report_data?.equipmentTag ?? '',
+        description: report.report_data?.equipmentDescription ?? '',
+        location: report.report_data?.location ?? '',
+        plantUnit: report.report_data?.plantUnitArea ?? '',
+        manufacturer: report.report_data?.manufacturer ?? '',
+        model: report.report_data?.model ?? '',
+        serialNumber: report.report_data?.serialNumber ?? '',
+        installationDate: report.report_data?.installationDate ?? '',
+        lastInspectionDate: report.report_data?.lastInspectionDate ?? '',
+      },
+
+      inspection: {
+        date: report.inspection_date ?? '',
+        type: report.report_data?.inspectionType ?? '',
+        method: report.report_data?.inspectionMethod ?? '',
+        temperature: report.report_data?.temperature ?? '',
+        pressure: report.report_data?.pressure ?? '',
+        humidity: report.report_data?.humidity ?? '',
+        findingsSummary: report.report_data?.findingsSummary ?? '',
+        recommendations: report.report_data?.recommendations ?? '',
+      },
+
+      dates: {
+        created: report.created_at?.split(' ')[0] ?? '',
+        submitted: report.submission_date?.split(' ')[0] ?? '',
+        reviewed: report.reviewed_at?.split(' ')[0] ?? '',
+        approved: report.signed_at?.split(' ')[0] ?? '',
+        dueDate: report.due_date ?? '',
+      },
+
+      attachments: [],   // map later if you have attachments table
+      comments: [],      // map later if you have comments table
+      history: [],       // map later if you have history table
+
+      metrics: {
+        riskScore: 0,
+        integrityScore: 0,
+        complianceScore: 0,
+        estimatedCost: 0,
+        estimatedTime: '',
+      },
+
+      relatedReports: [],
+    });
+
+    setIsLoading(false);
+  }, [report]);
 
   const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -611,12 +465,6 @@ export default function ShowReview({ report }: { report: any }) {
                     Attachments ({reportData.attachments.length})
                   </button>
                   <button
-                    onClick={() => setActiveTab('comments')}
-                    className={`px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'comments' ? 'text-red-600 border-b-2 border-red-600 dark:text-red-400 dark:border-red-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300'}`}
-                  >
-                    Comments ({reportData.comments.length})
-                  </button>
-                  <button
                     onClick={() => setActiveTab('history')}
                     className={`px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'history' ? 'text-red-600 border-b-2 border-red-600 dark:text-red-400 dark:border-red-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300'}`}
                   >
@@ -752,82 +600,6 @@ export default function ShowReview({ report }: { report: any }) {
                     </div>
                   </div>
                 )}
-
-                {activeTab === 'comments' && (
-                  <div className="space-y-6">
-                    {/* Add Comment */}
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Comment</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <textarea
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="Type your comment here..."
-                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:text-white"
-                            rows={3}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setCommentType('comment')}
-                              className={`px-3 py-1.5 text-sm rounded-lg ${commentType === 'comment' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                            >
-                              Comment
-                            </button>
-                            <button
-                              onClick={() => setCommentType('question')}
-                              className={`px-3 py-1.5 text-sm rounded-lg ${commentType === 'question' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
-                            >
-                              Question
-                            </button>
-                          </div>
-                          <button
-                            onClick={handleSubmitComment}
-                            disabled={!newComment.trim() || isSubmitting}
-                            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Send className="h-4 w-4" />
-                            Post Comment
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Comments List */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">All Comments</h3>
-                      {reportData.comments.map((comment) => (
-                        <div key={comment.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                              <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-2">
-                                <div>
-                                  <p className="font-medium text-gray-900 dark:text-white">{comment.user.name}</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">{comment.user.role} • {comment.timestamp}</p>
-                                </div>
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                  comment.type === 'comment' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' :
-                                  comment.type === 'question' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                                  comment.type === 'approval' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' :
-                                  'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                }`}>
-                                  {comment.type.toUpperCase()}
-                                </span>
-                              </div>
-                              <p className="text-gray-700 dark:text-gray-300">{comment.content}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {activeTab === 'history' && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Report History</h3>
