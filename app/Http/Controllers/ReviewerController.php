@@ -68,7 +68,8 @@ class ReviewerController extends Controller
             $equipmentTag = $jsonData['equipmentTag'] ?? 'N/A';
             $inspectorRole = $jsonData['inspectorRole'] ?? 'Inspector';
 
-            $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->id;
+            // ✅ FIX (necessary): your PK is report_id, so $report->id can be null
+            $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->getKey();
 
             $inspectionDate =
                 $jsonData['reportDate']
@@ -232,7 +233,23 @@ class ReviewerController extends Controller
             }
         }
 
-        $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->id;
+        // ✅ FIX (necessary): use report->getKey() not report->id
+        $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->getKey();
+
+        // ✅ ADDED (necessary for showing reviewer comment/history in UI if you want)
+        $reviewLogs = ReportReviewLog::where('report_id', $report->getKey())
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($log) {
+                return [
+                    'id' => $log->id,
+                    'report_id' => $log->report_id,
+                    'reviewer_id' => $log->reviewer_id,
+                    'action' => $log->action,
+                    'message' => $log->message,
+                    'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
+                ];
+            });
 
         return Inertia::render('Reviewer/ShowReview', [
             'report' => [
@@ -288,6 +305,9 @@ class ReviewerController extends Controller
                 }),
 
                 'photo_report_items' => $allPhotoItems,
+
+                // ✅ ADDED (optional but necessary if you want to show logs)
+                'review_logs' => $reviewLogs,
             ],
         ]);
     }

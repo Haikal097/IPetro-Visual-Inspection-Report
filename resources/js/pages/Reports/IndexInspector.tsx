@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Grid3x3,
   List,
+  MessageSquareText,
+  X,
 } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -38,6 +40,14 @@ type Status =
   | 'revisions_requested'
   | 'approved'
   | 'rejected';
+
+// ✅ ADDED (necessary): support showing reviewer reason from ReportReviewLog
+type ReviewLog = {
+  id?: number;
+  action: string;
+  message: string | null;
+  created_at?: string | null;
+};
 
 interface Report {
   id: number;
@@ -60,6 +70,12 @@ interface Report {
 
   hasPhotoReport?: boolean;
   photoReportId?: number | null;
+
+  // ✅ ADDED (necessary): backend can send this (recommended)
+  review_logs?: ReviewLog[];
+  // ✅ OPTIONAL fallback fields (if you prefer to send only latest)
+  review_reason?: string | null;
+  review_reason_at?: string | null;
 }
 
 interface Stats {
@@ -89,6 +105,20 @@ export default function Report({
   );
   const [searchQuery, setSearchQuery] = useState(filters?.search || '');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+  // ✅ ADDED (necessary): modal state for showing reason
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const [reasonReport, setReasonReport] = useState<Report | null>(null);
+
+  const openReason = (report: Report) => {
+    setReasonReport(report);
+    setReasonOpen(true);
+  };
+
+  const closeReason = () => {
+    setReasonOpen(false);
+    setReasonReport(null);
+  };
 
   // ADD THIS DEBUG CODE
   useEffect(() => {
@@ -196,11 +226,155 @@ export default function Report({
   // ✅ draft + revisions_requested can edit
   const canEdit = (status: Status) => status === 'draft' || status === 'revisions_requested';
 
+  // ✅ ADDED (necessary): only these statuses should show reason button
+  const hasReason = (report: Report) =>
+    report.status === 'rejected' || report.status === 'revisions_requested';
+
+  // ✅ ADDED (necessary): pick latest meaningful message (works if you pass review_logs OR review_reason)
+  const getLatestReason = (report: Report) => {
+    // Prefer logs if provided
+    const logs = Array.isArray(report.review_logs) ? report.review_logs : [];
+    const latestWithMessage =
+      logs.find((l) => !!(l?.message && String(l.message).trim().length > 0)) || null;
+
+    const actionFromLog = latestWithMessage?.action || null;
+    const messageFromLog = latestWithMessage?.message || null;
+    const createdAtFromLog = latestWithMessage?.created_at || null;
+
+    // fallback to report fields (if backend sends only latest reason)
+    const fallbackMessage = report.review_reason ?? null;
+    const fallbackAt = report.review_reason_at ?? null;
+
+    return {
+      action: actionFromLog ?? report.status,
+      message: messageFromLog ?? fallbackMessage,
+      created_at: createdAtFromLog ?? fallbackAt,
+    };
+  };
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="My Reports - iPETRO" />
 
       <div className="px-6 py-6 bg-gradient-to-br from-gray-50 via-white to-gray-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/50 min-h-screen">
+        {/* ✅ ADDED (necessary): Reason Modal */}
+        {reasonOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              // close when clicking outside
+              if (e.target === e.currentTarget) closeReason();
+            }}
+          >
+            <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-xl">
+              <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <MessageSquareText className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Review Reason
+                    </h3>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    {reasonReport?.title ?? 'Report'}
+                  </p>
+                </div>
+
+                <button
+                  onClick={closeReason}
+                  className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+                </button>
+              </div>
+
+              <div className="px-5 py-4">
+                {reasonReport ? (
+                  (() => {
+                    const latest = getLatestReason(reasonReport);
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(
+                              reasonReport.status
+                            )}`}
+                          >
+                            {getStatusIcon(reasonReport.status)}
+                            {formatStatus(reasonReport.status)}
+                          </span>
+
+                          {latest?.created_at && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              ({latest.created_at})
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4">
+                          {latest?.message ? (
+                            <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                              {latest.message}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              No comment provided by reviewer.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Optional: show history if you passed review_logs */}
+                        {Array.isArray(reasonReport.review_logs) && reasonReport.review_logs.length > 1 && (
+                          <div className="pt-2">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                              History
+                            </div>
+                            <div className="space-y-2 max-h-48 overflow-auto pr-1">
+                              {reasonReport.review_logs.map((log, idx) => (
+                                <div
+                                  key={(log.id ?? idx) as any}
+                                  className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                      {String(log.action || '').replaceAll('_', ' ')}
+                                    </div>
+                                    {log.created_at && (
+                                      <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                                        {log.created_at}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
+                                    {log.message || '—'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : null}
+              </div>
+
+              <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end">
+                <button
+                  onClick={closeReason}
+                  className="inline-flex items-center justify-center rounded-xl bg-gray-900 text-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold hover:opacity-95 transition-opacity"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
@@ -409,10 +583,30 @@ export default function Report({
                         </span>
                       </div>
 
-                      <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(report.status)}`}>
-                        {getStatusIcon(report.status)}
-                        {formatStatus(report.status)}
-                      </div>
+                      {/* ✅ CHANGED (necessary): status becomes clickable for rejected/revisions_requested */}
+                      {hasReason(report) ? (
+                        <button
+                          type="button"
+                          onClick={() => openReason(report)}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(
+                            report.status
+                          )} hover:opacity-90 transition-opacity`}
+                          title="Click to view reason"
+                        >
+                          {getStatusIcon(report.status)}
+                          {formatStatus(report.status)}
+                          <MessageSquareText className="h-3.5 w-3.5 ml-0.5" />
+                        </button>
+                      ) : (
+                        <div
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(
+                            report.status
+                          )}`}
+                        >
+                          {getStatusIcon(report.status)}
+                          {formatStatus(report.status)}
+                        </div>
+                      )}
                     </div>
 
                     {/* Metadata */}
@@ -537,10 +731,30 @@ export default function Report({
                         </td>
 
                         <td className="px-6 py-4">
-                          <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(report.status)}`}>
-                            {getStatusIcon(report.status)}
-                            {formatStatus(report.status)}
-                          </div>
+                          {/* ✅ CHANGED (necessary): status becomes clickable for rejected/revisions_requested */}
+                          {hasReason(report) ? (
+                            <button
+                              type="button"
+                              onClick={() => openReason(report)}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(
+                                report.status
+                              )} hover:opacity-90 transition-opacity`}
+                              title="Click to view reason"
+                            >
+                              {getStatusIcon(report.status)}
+                              {formatStatus(report.status)}
+                              <MessageSquareText className="h-3.5 w-3.5 ml-0.5" />
+                            </button>
+                          ) : (
+                            <div
+                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(
+                                report.status
+                              )}`}
+                            >
+                              {getStatusIcon(report.status)}
+                              {formatStatus(report.status)}
+                            </div>
+                          )}
                         </td>
 
                         <td className="px-6 py-4">
