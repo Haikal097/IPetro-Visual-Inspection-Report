@@ -228,6 +228,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/albums/{album}', [AlbumController::class, 'update'])->name('albums.update');
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Report Fix
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/reports/{report}/edit', [ReportController::class, 'edit'])
+    ->name('reports.edit');
+
 });
 
 /*

@@ -440,83 +440,111 @@ class ReportController extends Controller
             ->count();
     }
 
-    public function reportsPage(Request $request)
-    {
-        $user = Auth::user();
+public function reportsPage(Request $request)
+{
+    $user = Auth::user();
 
-        $query = Report::with(['creator', 'reviewer', 'photoReport', 'equipmentTemplate']);
+    $query = Report::with(['creator', 'reviewer', 'photoReport', 'equipmentTemplate']);
 
-        // Users can only see their own reports unless admin/reviewer
-        if (!in_array($user->role, ['admin', 'reviewer'])) {
-            $query->where('creator_id', $user->id);
-        }
-
-        // optional: filter status
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-
-        // optional: search (title, equipmentTag, equipmentType from json_data)
-        if ($request->filled('q')) {
-            $q = $request->q;
-            $query->where(function ($sub) use ($q) {
-                $sub->where('title', 'like', "%{$q}%")
-                    ->orWhere('json_data->equipmentTag', 'like', "%{$q}%")
-                    ->orWhere('json_data->equipmentType', 'like', "%{$q}%");
-            });
-        }
-
-        $reports = $query->orderBy('creation_date', 'desc')->get();
-
-        // ✅ CHANGED (necessary): include the extra statuses in stats
-        $stats = [
-            'total' => $reports->count(),
-            'draft' => $reports->where('status', 'draft')->count(),
-            'submitted' => $reports->where('status', 'submitted')->count(),
-            'approved' => $reports->where('status', 'approved')->count(),
-            'rejected' => $reports->where('status', 'rejected')->count(),
-            // keep extra stats optional (frontend can ignore)
-            'in_review' => $reports->where('status', 'in_review')->count(),
-            'revisions_requested' => $reports->where('status', 'revisions_requested')->count(),
-        ];
-
-        // Map DB -> your UI shape
-        $mappedReports = $reports->map(function ($r) use ($reports) {
-            $json = $r->json_data ?? [];
-            return [
-                'id' => (int) $r->report_id,
-                'title' => $r->title ?? ('Report #' . $r->report_id),
-
-                'equipment' => $json['equipmentType'] ?? ($r->equipment_type ?? 'N/A'),
-                'equipmentTag' => $json['equipmentTag'] ?? 'N/A',
-
-                'status' => $r->status,
-
-                'createdBy' => $r->creator?->name ?? 'Unknown',
-                'createdAt' => $r->creation_date
-                    ? Carbon::parse($r->creation_date)->format('Y-m-d')
-                    : ($r->created_at ? Carbon::parse($r->created_at)->format('Y-m-d') : '—'),
-
-                'lastUpdated' => $r->updated_at ? Carbon::parse($r->updated_at)->diffForHumans() : '—',
-
-                'reviewer' => $r->reviewer?->name ?? 'Not Assigned',
-
-                'dueDate' => $json['dueDate'] ?? null,
-
-                // ✅ ONLY CHANGE: real image count from photo_reports.report_data.items[].image
-                'attachments' => $this->countPhotoReportImages($r->photoReport),
-            ];
-        });
-
-        return inertia('Reports/IndexInspector', [
-            'reports' => $mappedReports,
-            'stats' => $stats,
-            'filters' => [
-                'status' => $request->status ?? 'all',
-                'q' => $request->q ?? '',
-            ],
-        ]);
+    // Users can only see their own reports unless admin/reviewer
+    if (!in_array($user->role, ['admin', 'reviewer'])) {
+        $query->where('creator_id', $user->id);
     }
+
+    // optional: filter status
+    if ($request->filled('status') && $request->status !== 'all') {
+        $query->where('status', $request->status);
+    }
+
+    // optional: search (title, equipmentTag, equipmentType from json_data)
+    if ($request->filled('q')) {
+        $q = $request->q;
+        $query->where(function ($sub) use ($q) {
+            $sub->where('title', 'like', "%{$q}%")
+                ->orWhere('json_data->equipmentTag', 'like', "%{$q}%")
+                ->orWhere('json_data->equipmentType', 'like', "%{$q}%");
+        });
+    }
+
+    $reports = $query->orderBy('creation_date', 'desc')->get();
+
+    // ✅ CHANGED (necessary): include the extra statuses in stats
+    $stats = [
+        'total' => $reports->count(),
+        'draft' => $reports->where('status', 'draft')->count(),
+        'submitted' => $reports->where('status', 'submitted')->count(),
+        'approved' => $reports->where('status', 'approved')->count(),
+        'rejected' => $reports->where('status', 'rejected')->count(),
+        'in_review' => $reports->where('status', 'in_review')->count(),
+        'revisions_requested' => $reports->where('status', 'revisions_requested')->count(),
+    ];
+
+    // ✅ ADDED (necessary): fetch all review logs in ONE query (no N+1)
+    $reportIds = $reports->map(fn($r) => $r->getKey())->values()->all();
+
+    $logsByReportId = \App\Models\ReportReviewLog::whereIn('report_id', $reportIds)
+        ->orderBy('created_at', 'desc')
+        ->get()
+        ->groupBy('report_id');
+
+    // Map DB -> your UI shape
+    $mappedReports = $reports->map(function ($r) use ($logsByReportId) {
+        $json = $r->json_data ?? [];
+
+        // ✅ ADDED (necessary): prepare logs + latest reason
+        $logs = $logsByReportId[$r->getKey()] ?? collect();
+
+        $reviewLogs = $logs->map(function ($l) {
+            return [
+                'id' => $l->id,
+                'action' => $l->action,
+                'message' => $l->message,
+                'created_at' => $l->created_at?->format('Y-m-d H:i:s'),
+            ];
+        })->values()->all();
+
+        $latestWithMessage = $logs->first(fn($l) => !empty(trim((string) $l->message))) ?? $logs->first();
+
+        return [
+            'id' => (int) $r->getKey(),
+            'title' => $r->title ?? ('Report #' . $r->getKey()),
+
+            'equipment' => $json['equipmentType'] ?? ($r->equipment_type ?? 'N/A'),
+            'equipmentTag' => $json['equipmentTag'] ?? 'N/A',
+
+            'status' => $r->status,
+
+            'createdBy' => $r->creator?->name ?? 'Unknown',
+            'createdAt' => $r->creation_date
+                ? Carbon::parse($r->creation_date)->format('Y-m-d')
+                : ($r->created_at ? Carbon::parse($r->created_at)->format('Y-m-d') : '—'),
+
+            'lastUpdated' => $r->updated_at ? Carbon::parse($r->updated_at)->diffForHumans() : '—',
+
+            'reviewer' => $r->reviewer?->name ?? 'Not Assigned',
+
+            'dueDate' => $json['dueDate'] ?? null,
+
+            // ✅ existing: image count
+            'attachments' => $this->countPhotoReportImages($r->photoReport),
+
+            // ✅ ADDED (necessary): what your modal needs
+            'review_logs' => $reviewLogs, // optional history in modal
+            'review_reason' => $latestWithMessage?->message,
+            'review_reason_at' => $latestWithMessage?->created_at?->format('Y-m-d H:i:s'),
+        ];
+    });
+
+    return inertia('Reports/IndexInspector', [
+        'reports' => $mappedReports,
+        'stats' => $stats,
+        'filters' => [
+            'status' => $request->status ?? 'all',
+            'q' => $request->q ?? '',
+        ],
+    ]);
+}
+
 
     public function resubmit(Report $report)
     {
@@ -546,4 +574,22 @@ class ReportController extends Controller
 
         return redirect('/reports')->with('success', 'Report resubmitted successfully.');
     }
+
+    public function edit(Report $report)
+{
+    // Allow only owner or admin (optional)
+    abort_unless(Auth::id() === $report->creator_id || Auth::user()->role === 'admin', 403);
+
+    $u = auth()->user();
+    $signatureUrl = $u?->signature_path
+        ? asset('storage/' . $u->signature_path)
+        : null;
+
+    return Inertia::render('Reports/PVReport', [
+        'report' => $report,          // ✅ send report to PVReport page
+        'mode' => 'edit',             // optional
+        'signatureUrl' => $signatureUrl,
+    ]);
+}
+
 }
