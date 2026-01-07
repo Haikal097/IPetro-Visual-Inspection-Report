@@ -214,6 +214,16 @@ class ReviewerController extends Controller
     
     public function showReview(Report $report)
     {
+        // ✅ minimal: ensure creator relationship is available if your model has it
+        $report->loadMissing('creator');
+
+        // ✅ moved before return (your original was after return, so it never ran)
+        $canReview = in_array($report->status, [
+            'submitted',
+            'in_review',
+            'revisions_requested',
+        ]);
+
         // 1) Decode reports.json_data
         $jsonData = [];
         if ($report->json_data) {
@@ -254,7 +264,8 @@ class ReviewerController extends Controller
         return Inertia::render('Reviewer/ShowReview', [
             'report' => [
                 // ===== reports table =====
-                'id' => $report->id,
+                'id' => $report->getKey(),
+                'report_id' => $report->getKey(), // optional but helps frontend fallback
                 'report_number' => $reportNumber,
                 'title' => $report->title ?? ($jsonData['title'] ?? 'Untitled Report'),
                 'inspection_date' => $jsonData['reportDate'] ?? optional($report->creation_date)->format('Y-m-d'),
@@ -271,6 +282,9 @@ class ReviewerController extends Controller
                 'inspector_id' => $report->inspector_id,
                 'submission_date' => $report->submission_date?->format('Y-m-d H:i:s'),
                 'signed_at' => $report->signed_at?->format('Y-m-d H:i:s'),
+
+                // ✅ send can_review to frontend (optional but helps)
+                'can_review' => $canReview,
 
                 'creator' => $report->creator ? [
                     'id' => $report->creator->id,
@@ -300,68 +314,60 @@ class ReviewerController extends Controller
                 'photo_report_items' => $allPhotoItems,
             ],
         ]);
-
-        $canReview = in_array($report->status, [
-            'submitted',
-            'in_review',
-            'revisions_requested',
-        ]);
-
     }
 
     public function approve(Report $report)
-{
-    // Only allow for reviewable statuses
-    abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
+    {
+        // Only allow for reviewable statuses
+        abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
 
-    $report->update([
-        'status' => 'approved',
-        'reviewer_id' => Auth::id(),
-        'signed_at' => now(), // optional
-    ]);
+        $report->update([
+            'status' => 'approved',
+            'reviewer_id' => Auth::id(),
+            'signed_at' => now(), // optional
+        ]);
 
-    // OPTIONAL: create notification to inspector (if you have notifications table)
-    // $this->notifyInspector($report, 'approved', 'Your report has been approved.');
+        // OPTIONAL: create notification to inspector (if you have notifications table)
+        // $this->notifyInspector($report, 'approved', 'Your report has been approved.');
 
-    return back()->with('success', 'Report approved.');
-}
+        return back()->with('success', 'Report approved.');
+    }
 
-public function reject(Request $request, Report $report)
-{
-    abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
+    public function reject(Request $request, Report $report)
+    {
+        abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
 
-    $request->validate([
-        'message' => 'nullable|string|max:2000',
-    ]);
+        $request->validate([
+            'message' => 'nullable|string|max:2000',
+        ]);
 
-    $report->update([
-        'status' => 'rejected',
-        'reviewer_id' => Auth::id(),
-    ]);
+        $report->update([
+            'status' => 'rejected',
+            'reviewer_id' => Auth::id(),
+        ]);
 
-    // OPTIONAL notify with reason
-    // $this->notifyInspector($report, 'rejected', $request->message ?? 'Report rejected.');
+        // OPTIONAL notify with reason
+        // $this->notifyInspector($report, 'rejected', $request->message ?? 'Report rejected.');
 
-    return back()->with('success', 'Report rejected.');
-}
+        return back()->with('success', 'Report rejected.');
+    }
 
-public function requestRevision(Request $request, Report $report)
-{
-    abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
+    public function requestRevision(Request $request, Report $report)
+    {
+        abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
 
-    $request->validate([
-        'message' => 'required|string|max:2000',
-    ]);
+        $request->validate([
+            'message' => 'required|string|max:2000',
+        ]);
 
-    $report->update([
-        'status' => 'revisions_requested',
-        'reviewer_id' => Auth::id(),
-    ]);
+        $report->update([
+            'status' => 'revisions_requested',
+            'reviewer_id' => Auth::id(),
+        ]);
 
-    // OPTIONAL notify with comment
-    // $this->notifyInspector($report, 'revisions_requested', $request->message);
+        // OPTIONAL notify with comment
+        // $this->notifyInspector($report, 'revisions_requested', $request->message);
 
-    return back()->with('success', 'Revision requested.');
-}
-
+        return back()->with('success', 'Revision requested.');
+    }
 }
