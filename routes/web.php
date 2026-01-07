@@ -165,6 +165,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('reports.photo-report.page');
 
+    // Printable view
+    Route::get('/reports/photo-report/print', function () {
+        // Retrieve print data from session storage
+        // This is handled by the frontend, but you might want to load from DB
+        return Inertia::render('PhotoReportPrint');
+    })->name('photo-report.print');
+
     // API-like endpoints (for Axios fetch/save)
     Route::get('/reports/{reportId}/photo-report', [PhotoReportController::class, 'getPhotoReport'])
         ->name('reports.photo-report.get');
@@ -191,14 +198,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['auth'])->group(function () {
         // Review dashboard
         Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
-
+        
         // Individual report review
-        Route::get('/reports/{report}/review', [ReviewerController::class, 'showReview'])->name('reports.showReview');
-
+        Route::get('/review/report/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
+        
         // Additional review routes (optional)
         Route::get('/reports/{report}/compare', [ReviewerController::class, 'compare'])->name('reports.compare');
         Route::get('/reports/{report}/comments', [ReviewerController::class, 'comments'])->name('reports.comments');
-
+        
         // Review actions
         Route::post('/reports/{report}/approve', [ReviewerController::class, 'approve'])->name('reports.approve');
         Route::post('/reports/{report}/reject', [ReviewerController::class, 'reject'])->name('reports.reject');

@@ -3,6 +3,7 @@ import AppLayout from "@/layouts/app-layout";
 import { Head, router } from "@inertiajs/react";
 import ipetroLogo from '@/assets/logo.png';
 import axios from 'axios';
+import PhotoReportPrint from '@/components/printable/PhotoReportPrint';
 
 type ItemId = number;
 
@@ -146,6 +147,8 @@ export default function PhotoReport() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
+  const [isPrinting, setIsPrinting] = useState(false);
+
   useEffect(() => {
     const styleId = "ipetro-photo-report-css";
     if (document.getElementById(styleId)) return;
@@ -548,16 +551,59 @@ export default function PhotoReport() {
     window.location.reload();
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    if (!data) return;
+    
+    // Save current state to localStorage or sessionStorage
+    const printData = {
+      data,
+      reportId,
+      photoReportId,
+      timestamp: new Date().toISOString()
+    };
+    
+    sessionStorage.setItem('printPhotoReport', JSON.stringify(printData));
+    
+    // Open print window
+    const printWindow = window.open('/reports/photo-report/print', '_blank');
+    if (printWindow) {
+      printWindow.focus();
+    } else {
+      alert('Please allow pop-ups for print preview');
+    }
+  };
+  if (isLoading) {
+  return (
+    <AppLayout breadcrumbs={[{ title: "Photo Report", href: "/reports/photo-report" }]}>
+      <Head title="Photo Report" />
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading photo report...</p>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
 
-  if (isLoading || !data) {
-    return (
-      <AppLayout breadcrumbs={[{ title: "Photo Report", href: "/reports/photo-report" }]}>
-        <Head title="Photo Report" />
-        <div className="p-10 text-center text-gray-500">Loading report data...</div>
-      </AppLayout>
-    );
-  }
+if (!data) {
+  return (
+    <AppLayout breadcrumbs={[{ title: "Photo Report", href: "/reports/photo-report" }]}>
+      <Head title="Photo Report" />
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center text-red-600">
+          <p>Failed to load report data. Please try again.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
 
   return (
     <AppLayout breadcrumbs={[{ title: "Photo Report", href: "/reports/photo-report" }]}>

@@ -294,7 +294,8 @@ class Report extends Model
         return $this->belongsTo(\App\Models\EquipmentTemplate::class, 'equipment_template_id');
     }
 
-
-    
-
+    public function getRouteKeyName()
+    {
+        return 'report_id';
+    }
 }

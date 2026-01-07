@@ -45,10 +45,9 @@ class ReviewerController extends Controller
             }
             
             // Get photo reports for attachments count
-            $photoReports = PhotoReport::where('report_id', $report->id)->get();
+            $photoReports = PhotoReport::where('report_id', $report->getKey())->get();
             $attachmentsCount = 0;
             $allPhotoItems = [];
-            
             foreach ($photoReports as $photoReport) {
                 if ($photoReport->report_data) {
                     try {
@@ -100,8 +99,8 @@ class ReviewerController extends Controller
             $daysPending = $submissionDate ? Carbon::parse($submissionDate)->diffInDays(now()) : 0;
             
             return [
-                'id' => $report->id,
-                'report_id' => $report->id,
+                'id' => $report->getKey(),
+                'report_id' => $report->getKey(),
                 'report_number' => $reportNumber,
                 'title' => $title,
                 'json_data' => $jsonData,
@@ -201,62 +200,85 @@ class ReviewerController extends Controller
     
     public function showReview(Report $report)
     {
-        // Parse json_data from report
+        // 1) Decode reports.json_data
         $jsonData = [];
         if ($report->json_data) {
             try {
-                $jsonData = is_string($report->json_data) 
-                    ? json_decode($report->json_data, true) 
+                $jsonData = is_string($report->json_data)
+                    ? json_decode($report->json_data, true)
                     : $report->json_data;
             } catch (\Exception $e) {
                 $jsonData = [];
             }
         }
-        
-        // Get photo reports
-        $photoReports = PhotoReport::where('report_id', $report->id)->get();
+
+        // 2) Get ALL related photo_reports rows
+        $photoReports = PhotoReport::where('report_id', $report->getKey())->get();
+
+        // 3) Extract all photo items from photo_reports.report_data
         $allPhotoItems = [];
-        
+
         foreach ($photoReports as $photoReport) {
-            if ($photoReport->report_data) {
-                try {
-                    $photoData = is_string($photoReport->report_data) 
-                        ? json_decode($photoReport->report_data, true) 
-                        : $photoReport->report_data;
-                    
-                    if (!empty($photoData['items'])) {
-                        $allPhotoItems = array_merge($allPhotoItems, $photoData['items']);
-                    }
-                } catch (\Exception $e) {
-                    // Skip invalid JSON
+            if (!$photoReport->report_data) continue;
+
+            try {
+                $photoData = is_string($photoReport->report_data)
+                    ? json_decode($photoReport->report_data, true)
+                    : $photoReport->report_data;
+
+                if (!empty($photoData['items']) && is_array($photoData['items'])) {
+                    $allPhotoItems = array_merge($allPhotoItems, $photoData['items']);
                 }
+            } catch (\Exception $e) {
+                // skip invalid JSON
             }
         }
-        
-        // Get report number
+
+        // 4) Report number
         $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->id;
-        
-        return Inertia::render('Reports/ShowReview', [
+
+        return Inertia::render('Reviewer/ShowReview', [
             'report' => [
+                // ===== reports table =====
                 'id' => $report->id,
                 'report_number' => $reportNumber,
-                'title' => $report->title ?? $jsonData['title'] ?? 'Untitled Report',
-                'inspection_date' => $jsonData['reportDate'] ?? $report->creation_date?->format('Y-m-d') ?? null,
+                'title' => $report->title ?? ($jsonData['title'] ?? 'Untitled Report'),
+                'inspection_date' => $jsonData['reportDate'] ?? optional($report->creation_date)->format('Y-m-d'),
                 'pmt' => $jsonData['pmt'] ?? null,
                 'tag' => $jsonData['equipmentTag'] ?? null,
-                'plant_unit' => $jsonData['plantUnitArea'] ?? $jsonData['plantUnit'] ?? null,
+                'plant_unit' => $jsonData['plantUnitArea'] ?? ($jsonData['plantUnit'] ?? null),
                 'description' => $jsonData['description'] ?? null,
                 'report_data' => $jsonData,
-                'photo_report_items' => $allPhotoItems,
-                'created_at' => $report->created_at->format('Y-m-d H:i:s'),
-                'updated_at' => $report->updated_at->format('Y-m-d H:i:s'),
+                'created_at' => $report->created_at?->format('Y-m-d H:i:s'),
+                'updated_at' => $report->updated_at?->format('Y-m-d H:i:s'),
                 'status' => $report->status,
                 'reviewer_id' => $report->reviewer_id,
                 'creator_id' => $report->creator_id,
                 'inspector_id' => $report->inspector_id,
                 'submission_date' => $report->submission_date?->format('Y-m-d H:i:s'),
                 'signed_at' => $report->signed_at?->format('Y-m-d H:i:s'),
-            ]
+
+                // ===== photo_reports table (rows) =====
+                'photo_reports' => $photoReports->map(function ($pr) {
+                    return [
+                        'id' => $pr->id,
+                        'report_id' => $pr->report_id,
+                        'report_title' => $pr->report_title,
+                        'report_number' => $pr->report_number,
+                        'inspection_date' => $pr->inspection_date,
+                        'pmt' => $pr->pmt,
+                        'tag' => $pr->tag,
+                        'description' => $pr->description,
+                        'plant_unit' => $pr->plant_unit,
+                        'created_at' => $pr->created_at?->format('Y-m-d H:i:s'),
+                        'updated_at' => $pr->updated_at?->format('Y-m-d H:i:s'),
+                    ];
+                }),
+
+                // ===== extracted items from report_data JSON =====
+                'photo_report_items' => $allPhotoItems,
+            ],
         ]);
     }
+
 }

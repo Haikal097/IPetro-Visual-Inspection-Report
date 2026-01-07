@@ -55,7 +55,6 @@ interface DatabaseReviewItem {
     pmt?: string;
     plant_unit?: string;
     description?: string;
-    attachments: number;
     has_photo_report: boolean;
     photo_report_id?: number;
     reviewer_id?: number;
@@ -75,7 +74,6 @@ interface ReviewItem {
     inspectionDate: string;
     daysPending: number;
     status: 'pending' | 'in-review' | 'approved' | 'revisions-requested' | 'rejected';
-    attachments: number;
     lastActivity: string;
     pmt?: string;
     plantUnit?: string;
@@ -105,6 +103,9 @@ interface Props {
 }
 
 export default function ReviewDashboard({ reviews, stats, filters }: Props) {
+        console.log('Raw reviews data from props:', reviews);
+    console.log('Total reviews fetched:', reviews.length);
+
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'in-review' | 'revisions'>(
         (filters?.status as any) || 'all'
     );
@@ -116,6 +117,9 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
     // Transform database data to match component interface
     const transformDatabaseData = (dbReviews: DatabaseReviewItem[]): ReviewItem[] => {
         return dbReviews.map(item => {
+            // Use the id from the controller (which is now report_id)
+            const dbId = item.id; // This should now be 78, etc.
+            
             const jsonData = item.json_data || {};
             
             // Use the dates from the controller
@@ -125,7 +129,7 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
             // Calculate days pending
             const daysPending = Math.floor((Date.now() - submissionDate.getTime()) / (1000 * 60 * 60 * 24));
             
-            // Status is already mapped in the controller, but keep this as fallback
+            // Status mapping
             const statusMap: Record<string, ReviewItem['status']> = {
                 'pending': 'pending',
                 'draft': 'pending',
@@ -160,8 +164,8 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
             }
             
             return {
-                id: `REV-${item.id}`,
-                reportId: item.report_number || `RPT-${item.id}`,
+                id: `REV-${dbId}`, // Use the actual ID
+                reportId: item.report_number || `RPT-${dbId}`,
                 title: item.title,
                 inspector: item.inspector_name,
                 inspectorRole: item.inspector_role,
@@ -171,13 +175,12 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
                 inspectionDate: inspectionDate.toISOString().split('T')[0],
                 daysPending: Math.max(0, daysPending),
                 status,
-                attachments: item.attachments,
                 lastActivity,
                 pmt: item.pmt,
                 plantUnit: item.plant_unit,
                 description: item.description,
                 hasPhotoReport: item.has_photo_report,
-                dbId: item.id,
+                dbId: dbId, // This is the important one for the link
                 reviewerId: item.reviewer_id,
                 creatorId: item.creator_id,
                 inspectorId: item.inspector_id,
@@ -361,65 +364,6 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
                     </div>
                 </div>
 
-                {/* Secondary Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    {/* Avg Review Time - Purple Theme */}
-                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10 rounded-xl border border-purple-200 dark:border-purple-800/30 p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Avg. Review Time</p>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{dashboardStats.avgReviewTime} days</p>
-                            </div>
-                            <div className="p-2 bg-white dark:bg-purple-900/40 rounded-lg">
-                                <Timer className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Completed Today - Emerald Theme */}
-                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800/30 p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Completed Today</p>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{dashboardStats.completedToday} reports</p>
-                            </div>
-                            <div className="p-2 bg-white dark:bg-emerald-900/40 rounded-lg">
-                                <CheckSquare className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Overdue Reviews - Red Theme */}
-                    <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/10 rounded-xl border border-red-200 dark:border-red-800/30 p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-red-600 dark:text-red-400">Overdue Reviews</p>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                                    {stats.overdue_reviews || 0}
-                                </p>
-                            </div>
-                            <div className="p-2 bg-white dark:bg-red-900/40 rounded-lg">
-                                <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Total Reviews - Blue Theme */}
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 rounded-xl border border-blue-200 dark:border-blue-800/30 p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Reviews</p>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                                    {stats.total_reviews || reviewItems.length}
-                                </p>
-                            </div>
-                            <div className="p-2 bg-white dark:bg-blue-900/40 rounded-lg">
-                                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Main Review Queue Card */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg overflow-hidden mb-8">
                     {/* Header with Filters */}
@@ -552,10 +496,6 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
                                                                 <Clock className="h-3.5 w-3.5" />
                                                                 <span>{item.daysPending} days pending</span>
                                                             </div>
-                                                            <div className="flex items-center gap-1">
-                                                                <FileText className="h-3.5 w-3.5" />
-                                                                <span>{item.attachments} photos</span>
-                                                            </div>
                                                             {item.pmt && (
                                                                 <div className="flex items-center gap-1">
                                                                     <span>PMT: {item.pmt}</span>
@@ -589,7 +529,7 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <Link
-                                                        href={`/reports/${item.dbId}/review`}
+                                                        href={`/review/report/${item.dbId}`}
                                                         className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/40"
                                                     >
                                                         <Eye className="h-4 w-4" />
