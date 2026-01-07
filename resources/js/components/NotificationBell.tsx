@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, router } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react"; // ✅ ADDED usePage
 import axios from "axios";
 
 type Notif = {
@@ -24,7 +24,6 @@ type Notif = {
   read_at?: string | null;
 };
 
-
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -33,6 +32,12 @@ export default function NotificationBell() {
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   const [loading, setLoading] = useState(false);
+
+  // ✅ ADDED: get user role from Inertia props
+  const page = usePage() as any;
+  const userRole: string | null = page?.props?.auth?.user?.role ?? null;
+  const isReviewer = userRole === "reviewer";
+  const isAdmin = userRole === "admin";
 
   function csrfHeaders() {
     return {
@@ -75,6 +80,9 @@ export default function NotificationBell() {
 
   // ✅ Decide where to go for each notification
   const resolveTargetUrl = (n: Notif) => {
+    // ✅ ADDED: reviewer should NOT go to inspector report pages
+    if (isReviewer && n.report_id) return `/review/report/${n.report_id}`;
+
     // Prefer backend url if provided
     if (n.url) return n.url;
 
@@ -89,25 +97,15 @@ export default function NotificationBell() {
   };
 
   const openNotification = async (n: any) => {
-  await axios.post(`/notifications/${n.id}/read`, {}, { headers: csrfHeaders() });
-  await load();
+    await axios.post(`/notifications/${n.id}/read`, {}, { headers: csrfHeaders() });
+    await load();
 
-  // ✅ Prefer backend-provided URL
-  if (n.url) {
-    router.visit(n.url);
-  } else if (n.report_id) {
-    router.visit(`/pv-report/${n.report_id}`);
-  } else if (n.inspection_id) {
-    router.visit(`/inspection-calendar?inspection=${n.inspection_id}`);
-  } else {
-    router.visit("/inspection-calendar");
-  }
+    // ✅ ADDED: enforce role-based routing
+    const target = resolveTargetUrl(n);
+    router.visit(target);
 
-  setOpen(false);
-};
-
-
-
+    setOpen(false);
+  };
 
   async function refresh() {
     await load();
@@ -226,7 +224,6 @@ export default function NotificationBell() {
                       <span className="mt-1 h-2 w-2 rounded-full bg-red-500 shrink-0"></span>
                     </div>
 
-
                     <div className="mt-2 flex items-center gap-3">
                       <button
                         type="button"
@@ -258,43 +255,50 @@ export default function NotificationBell() {
             <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">RECENT</div>
 
             {recent.length ? (
-                recent.map((n) => (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onClick={() => openNotification(n)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900"
-                  >
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {n.title}
+              recent.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => openNotification(n)}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900"
+                >
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {n.title}
+                  </div>
+
+                  {n.message ? (
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                      {n.message}
                     </div>
-
-                    {n.message ? (
-                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {n.message}
-                      </div>
-                    ) : (
-                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {n.read_at ? "Read" : "Unread"}
-                      </div>
-                    )}
-                  </button>
-                ))
-              ) : (
-                <div className="px-4 pb-4 text-sm text-gray-500 dark:text-gray-400">
-                  No notifications yet.
-                </div>
-              )}
-
+                  ) : (
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {n.read_at ? "Read" : "Unread"}
+                    </div>
+                  )}
+                </button>
+              ))
+            ) : (
+              <div className="px-4 pb-4 text-sm text-gray-500 dark:text-gray-400">
+                No notifications yet.
+              </div>
+            )}
           </div>
 
           <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            {/* ✅ ADDED: role-based footer links */}
             <Link href="/inspection-calendar" className="text-sm font-semibold text-red-600 hover:underline">
               Calendar
             </Link>
-            <Link href="/reports" className="text-sm font-semibold text-red-600 hover:underline">
-              Reports
-            </Link>
+
+            {isReviewer ? (
+              <Link href="/review" className="text-sm font-semibold text-red-600 hover:underline">
+                Reviews
+              </Link>
+            ) : (
+              <Link href="/reports" className="text-sm font-semibold text-red-600 hover:underline">
+                Reports
+              </Link>
+            )}
           </div>
         </div>
       )}
