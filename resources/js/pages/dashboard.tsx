@@ -47,6 +47,12 @@ export default function Dashboard() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [chartFilter, setChartFilter] = useState<'week' | 'month'>('week');
 
+    // ✅ FIX: keep state synced when Inertia sends new props
+    useEffect(() => {
+        setReports(initialReports);
+        setFilteredReports(initialReports);
+    }, [initialReports]);
+
     // Calculate statistics from actual data
     const calculateStats = (reports: Report[]): DashboardStats => {
         const totalReports = reports.length;
@@ -75,27 +81,52 @@ export default function Dashboard() {
 
     const stats = calculateStats(reports);
 
+    // ✅ FIX: real chart data (no random)
+    const isCompleted = (r: Report) => ['approved', 'closed'].includes(r.status);
+
+    const getCompletedDate = (r: Report) => {
+        // if you store completion moment in signed_at, use it; else fallback
+        return r.signed_at ?? r.creation_date;
+    };
+
+    const startOfDay = (d: Date) => {
+        const x = new Date(d);
+        x.setHours(0, 0, 0, 0);
+        return x;
+    };
+
+    const sameDay = (a: Date, b: Date) =>
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+
     // Prepare chart data based on actual report dates
     const prepareChartData = () => {
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
-            const date = new Date();
-            date.setDate(date.getDate() - i);
-            return date.toLocaleDateString('en-US', { weekday: 'short' });
-        }).reverse();
+        const today = startOfDay(new Date());
+        const days = chartFilter === 'week' ? 7 : 30;
 
-        // Group reports by creation date for last 7 days
-        const reportsCreated = last7Days.map(day => {
-            // Simplified calculation - in real app, you'd filter by actual dates
-            return Math.floor(Math.random() * 15) + 5; // Mock data for demo
+        const rangeDates = Array.from({ length: days }, (_, i) => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - (days - 1 - i));
+            return d;
         });
 
-        const reportsCompleted = last7Days.map(day => {
-            // Simplified calculation - in real app, you'd filter by completion dates
-            return Math.floor(Math.random() * 10) + 3; // Mock data for demo
-        });
+        const labels = rangeDates.map(d =>
+            chartFilter === 'week'
+                ? d.toLocaleDateString('en-US', { weekday: 'short' })
+                : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        );
+
+        const reportsCreated = rangeDates.map(d =>
+            reports.filter(r => sameDay(startOfDay(new Date(r.creation_date)), d)).length
+        );
+
+        const reportsCompleted = rangeDates.map(d =>
+            reports.filter(r => isCompleted(r) && sameDay(startOfDay(new Date(getCompletedDate(r))), d)).length
+        );
 
         return {
-            labels: last7Days,
+            labels,
             datasets: [
                 {
                     label: 'Reports Created',
@@ -117,6 +148,10 @@ export default function Dashboard() {
 
     const chartData = prepareChartData();
 
+    // ✅ FIX: real totals for the mini summary (no *0.7)
+    const createdTotalInRange = (chartData.datasets?.[0]?.data || []).reduce((a: number, b: any) => a + Number(b), 0);
+    const completedTotalInRange = (chartData.datasets?.[1]?.data || []).reduce((a: number, b: any) => a + Number(b), 0);
+
     const chartOptions = {
         responsive: true,
         plugins: {
@@ -128,7 +163,7 @@ export default function Dashboard() {
             },
             title: {
                 display: true,
-                text: 'Report Activity - Last 7 Days',
+                text: chartFilter === 'week' ? 'Report Activity - Last 7 Days' : 'Report Activity - Last 30 Days',
                 color: '#ffffff',
                 font: {
                     size: 16,
@@ -404,7 +439,7 @@ export default function Dashboard() {
                                                 <div className="h-3 w-3 rounded-full bg-red-500"></div>
                                                 <span className="text-gray-600 dark:text-gray-400">Created</span>
                                                 <span className="font-semibold text-gray-900 dark:text-white">
-                                                    {stats.thisWeek}
+                                                    {createdTotalInRange}
                                                 </span>
                                             </div>
                                             <div className="h-4 w-px bg-gray-200 dark:bg-gray-700"></div>
@@ -412,7 +447,7 @@ export default function Dashboard() {
                                                 <div className="h-3 w-3 rounded-full bg-gray-500"></div>
                                                 <span className="text-gray-600 dark:text-gray-400">Completed</span>
                                                 <span className="font-semibold text-gray-900 dark:text-white">
-                                                    {Math.floor(stats.thisWeek * 0.7)}
+                                                    {completedTotalInRange}
                                                 </span>
                                             </div>
                                         </div>

@@ -11,7 +11,7 @@ class InspectionCalendarController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Calendar/InspectionCalendar');
+        return Inertia::render('calendar/InspectionCalendar');
     }
 
     /**
