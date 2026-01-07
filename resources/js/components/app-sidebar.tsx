@@ -13,7 +13,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Folder, LayoutGrid, Image, FileText, Shield, Users, Calendar } from 'lucide-react';
+import { Folder, LayoutGrid, Image, FileText, Shield, Users, Calendar, CircleCheckBig, CircleX } from 'lucide-react';
 import AppLogo from './app-logo';
 import { useEffect } from 'react';
 
@@ -37,6 +37,8 @@ const inspectorNav: NavItem[] = [
 
 const reviewerNav: NavItem[] = [
   { title: 'Dashboard', href: '/review', icon: LayoutGrid },
+  { title: 'Approved Report', href: '/approvedreport', icon: CircleCheckBig },
+  { title: 'Rejected Report', href: '/rejectedreport', icon: CircleX },
 ];
 
 const adminNav: NavItem[] = [

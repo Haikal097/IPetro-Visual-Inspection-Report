@@ -22,9 +22,6 @@ import {
 } from 'lucide-react';
 
 export default function ShowReview({ report }: { report: any }) {
-  console.log("REPORT FROM DB:", report);
-  console.log("PHOTO_REPORTS ROWS:", report.photo_reports);
-  console.log("PHOTO ITEMS:", report.photo_report_items);
 
   // ✅ IMPORTANT: some payloads use report_id instead of id
   const reportId = report?.id ?? report?.report_id;
@@ -110,7 +107,8 @@ export default function ShowReview({ report }: { report: any }) {
   // ✅ REVIEW ACTIONS (routes match web.php: /review/{report}/...)
   const approveReport = () => {
     if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
-    router.post(`/review/${reportId}/approve`);
+    const message = prompt("Optional comment for approval? (press Cancel to skip)") || "";
+    router.post(`/review/${reportId}/approve`, { message });
   };
 
   const rejectReport = () => {
@@ -642,12 +640,6 @@ export default function ShowReview({ report }: { report: any }) {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Reviewer ID</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {report.reviewer_id || 'Not Assigned'}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Inspector ID</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {report.inspector_id || 'N/A'}
                   </p>
                 </div>
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
