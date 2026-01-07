@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
+import PhotoReportPrint from '@/components/printable/PhotoReportPrint'; // Add this import
 import {
   FileText,
   CheckCircle,
@@ -15,7 +16,8 @@ import {
   AlertCircle,
   ShieldCheck,
   Wrench,
-  MessageSquare
+  MessageSquare,
+  Printer
 } from 'lucide-react';
 
 export default function ShowReview({ report }: { report: any }) {
@@ -27,6 +29,8 @@ export default function ShowReview({ report }: { report: any }) {
   const reportId = report?.id ?? report?.report_id;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'findings' | 'photo-items' | 'details'>('overview');
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [printData, setPrintData] = useState<any>(null);
 
   const breadcrumbs = [
     { title: 'Reports', href: '/review' },
@@ -50,6 +54,37 @@ export default function ShowReview({ report }: { report: any }) {
     router.get(`/reports/photo-report?report_id=${reportId}`);
   };
 
+  const handlePrintPhotoReport = () => {
+    if (!report.photo_reports || report.photo_reports.length === 0) {
+      alert('No photo report data available');
+      return;
+    }
+
+    // Get the first photo report
+    const photoReport = report.photo_reports[0];
+    
+    // Prepare data for the print component
+    const printData = {
+      reportTitle: photoReport.report_title || report.title || 'Untitled Report',
+      reportNumber: photoReport.report_number || report.report_number || 'N/A',
+      inspectionDate: photoReport.inspection_date || report.inspection_date || report.created_at,
+      pmt: photoReport.pmt || 'N/A',
+      tag: photoReport.tag || 'N/A',
+      description: photoReport.description || 'N/A',
+      plantUnit: photoReport.plant_unit || report.plant_unit || 'N/A',
+      items: report.photo_report_items?.map((item: any) => ({
+        id: item.id,
+        title: item.title || `Item`,
+        findings: item.findings || '',
+        requirements: item.requirements || '',
+        image: item.image || null
+      })) || []
+    };
+
+    setPrintData(printData);
+    setShowPrintPreview(true);
+  };
+
   const validPhotoItems = report.photo_report_items?.filter((item: any) =>
     item.title || item.findings || item.image || item.requirements
   );
@@ -58,26 +93,49 @@ export default function ShowReview({ report }: { report: any }) {
 
   const canReview = ['submitted', 'in_review'].includes(report.status);
 
-
   // ✅ REVIEW ACTIONS (routes match web.php: /review/{report}/...)
   const approveReport = () => {
-  if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
-  router.post(`/review/${reportId}/approve`);
-};
+    if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
+    router.post(`/review/${reportId}/approve`);
+  };
 
-const rejectReport = () => {
-  if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
-  const message = prompt("Reason for rejection? (optional)") || "";
-  router.post(`/review/${reportId}/reject`, { message });
-};
+  const rejectReport = () => {
+    if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
+    const message = prompt("Reason for rejection? (optional)") || "";
+    router.post(`/review/${reportId}/reject`, { message });
+  };
 
-const requestRevision = () => {
-  if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
-  const message = prompt("What needs to be fixed? (required)");
-  if (!message || !message.trim()) return;
-  router.post(`/review/${reportId}/request-revision`, { message });
-};
+  const requestRevision = () => {
+    if (!reportId) return alert("Missing reportId from backend (report.id/report.report_id is null)");
+    const message = prompt("What needs to be fixed? (required)");
+    if (!message || !message.trim()) return;
+    router.post(`/review/${reportId}/request-revision`, { message });
+  };
 
+  // Close print preview if open
+  useEffect(() => {
+    if (showPrintPreview) {
+      // Add a listener for print dialog close
+      const handleAfterPrint = () => {
+        setShowPrintPreview(false);
+      };
+      
+      window.addEventListener('afterprint', handleAfterPrint);
+      return () => window.removeEventListener('afterprint', handleAfterPrint);
+    }
+  }, [showPrintPreview]);
+
+  // If showing print preview, render the PhotoReportPrint component
+  if (showPrintPreview && printData) {
+    return (
+      <PhotoReportPrint 
+        data={printData}
+        reportId={reportId}
+        photoReportId={report.photo_reports?.[0]?.id}
+        logoUrl="/path/to/your/logo.png" // Update this path
+      />
+    );
+  }
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -118,6 +176,13 @@ const requestRevision = () => {
               >
                 <Eye className="h-4 w-4" />
                 View Photo Report
+              </button>
+              <button
+                onClick={handlePrintPhotoReport}
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/25 shadow-md"
+              >
+                <Printer className="h-4 w-4" />
+                Print Photo Report
               </button>
             </div>
           </div>
@@ -386,33 +451,53 @@ const requestRevision = () => {
                 {/* DETAILS TAB */}
                 {activeTab === 'details' && (
                   <div className="space-y-6">
+                    {/* Report Metadata - More Compact */}
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Report Metadata</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Report ID</p>
-                          <p className="font-medium text-gray-900 dark:text-white">{reportId ?? 'N/A'}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Report ID</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white break-all">{reportId ?? 'N/A'}</p>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Report Number</p>
-                          <p className="font-medium text-gray-900 dark:text-white">{report.report_number}</p>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Report Number</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.report_number}</p>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Status</p>
-                          <p className="font-medium text-gray-900 dark:text-white">{currentStatus}</p>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Status</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">{currentStatus}</p>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Last Updated</p>
-                          <p className="font-medium text-gray-900 dark:text-white">{report.updated_at}</p>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Last Updated</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.updated_at}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Created</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.created_at}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Submitted</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.submission_date || 'Not Submitted'}</p>
                         </div>
                       </div>
                     </div>
 
+                    {/* Photo Reports Summary */}
                     {report.photo_reports && report.photo_reports.length > 0 && (
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Photo Reports</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Photo Reports</h3>
+                          <button
+                            onClick={handlePrintPhotoReport}
+                            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-blue-700 hover:to-blue-800"
+                          >
+                            <Printer className="h-4 w-4" />
+                            Print Report
+                          </button>
+                        </div>
+                        
                         <div className="space-y-4">
-                          {report.photo_reports.map((photoReport: any) => (
+                          {report.photo_reports.map((photoReport: any, index: number) => (
                             <div key={photoReport.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -448,20 +533,55 @@ const requestRevision = () => {
                                   <p className="text-sm text-gray-800 dark:text-gray-200">{photoReport.description}</p>
                                 </div>
                               )}
+                              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-500">
+                                  Photo Report ID: {photoReport.id} • Created: {photoReport.created_at}
+                                </p>
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Raw Report Data</h3>
-                      <div className="bg-gray-900 rounded-lg p-4 overflow-auto max-h-96">
-                        <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-                          {JSON.stringify(report.report_data, null, 2)}
-                        </pre>
+                    {/* Photo Items Summary */}
+                    {validPhotoItems && validPhotoItems.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Photo Items Summary</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {validPhotoItems.slice(0, 6).map((item: any, index: number) => (
+                            <div key={item.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                              <div className="flex items-start gap-2">
+                                {item.image && (
+                                  <div className="flex-shrink-0">
+                                    <img
+                                      src={item.image}
+                                      alt={item.title || `Item ${index + 1}`}
+                                      className="w-16 h-16 object-cover rounded"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                    {item.title || `Item ${index + 1}`}
+                                  </h4>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                                    {item.findings || 'No findings'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {validPhotoItems.length > 6 && (
+                          <div className="mt-3 text-center">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              ...and {validPhotoItems.length - 6} more items
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -560,35 +680,40 @@ const requestRevision = () => {
               </div>
             </div>
 
-            {/* Actions Panel */}
-            {canReview && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Review Actions</h3>
-                <div className="space-y-3">
-                  <button
-                    onClick={approveReport}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-emerald-700 hover:to-emerald-800"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    Approve Report
-                  </button>
-                  <button
-                    onClick={rejectReport}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Reject Report
-                  </button>
-                  <button
-                    onClick={requestRevision}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Request Revision
-                  </button>
+              {/* Actions Panel */}
+              {canReview && report.status !== 'revisions_requested' && (
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Review Actions
+                  </h3>
+
+                  <div className="space-y-3">
+                    <button
+                      onClick={approveReport}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-emerald-700 hover:to-emerald-800"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Approve Report
+                    </button>
+
+                    <button
+                      onClick={rejectReport}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Reject Report
+                    </button>
+
+                    <button
+                      onClick={requestRevision}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Request Revision
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         </div>
       </div>
