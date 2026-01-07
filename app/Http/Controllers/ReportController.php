@@ -448,11 +448,10 @@ class ReportController extends Controller
         ];
 
         // Map DB -> your UI shape
-        $mappedReports = $reports->map(function ($r) {
+        $mappedReports = $reports->map(function ($r) use ($reports) {
             $json = $r->json_data ?? [];
-
             return [
-                'id' => (string) $r->report_id,
+                'id' => (int) $r->report_id,
                 'title' => $r->title ?? ('Report #' . $r->report_id),
 
                 'equipment' => $json['equipmentType'] ?? ($r->equipment_type ?? 'N/A'),
