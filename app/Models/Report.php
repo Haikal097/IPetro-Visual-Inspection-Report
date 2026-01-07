@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
+// ✅ REQUIRED imports (so you don't rely on full namespaces below)
+use App\Models\User;
+use App\Models\PhotoReport;
+use App\Models\EquipmentTemplate;
+
 class Report extends Model
 {
     /**
@@ -50,7 +55,8 @@ class Report extends Model
         'creation_date',
         'submission_date',
         'json_data',
-        'equipment_template_id', // ✅ add this
+        'equipment_template_id',
+        // (not adding inspector_id here because you said don't change unnecessary)
     ];
 
     /**
@@ -177,10 +183,15 @@ class Report extends Model
 
     /**
      * Scope a query to only include reports pending review.
+     *
+     * ✅ FIX: group OR conditions to avoid breaking when combined with other WHERE filters
      */
     public function scopePendingReview($query)
     {
-        return $query->where('status', 'submitted')->orWhere('status', 'in_review');
+        return $query->where(function ($q) {
+            $q->where('status', 'submitted')
+              ->orWhere('status', 'in_review');
+        });
     }
 
     /**
@@ -234,10 +245,9 @@ class Report extends Model
      */
     public function reject($reviewerId, $feedback = null): bool
     {
-        // Store feedback in json_data
         $jsonData = $this->json_data ?? [];
         $jsonData['rejection_feedback'] = $feedback;
-        
+
         return $this->update([
             'status' => 'rejected',
             'reviewer_id' => $reviewerId,
@@ -257,15 +267,15 @@ class Report extends Model
         });
     }
 
-
-    // app/Models/Report.php
-
-    public function inspector()
+    /**
+     * Inspector relation
+     */
+    public function inspector(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'inspector_id');
+        return $this->belongsTo(User::class, 'inspector_id');
     }
 
-        /**
+    /**
      * Get the photo report associated with this report
      */
     public function photoReport(): HasOne
@@ -289,13 +299,39 @@ class Report extends Model
         return $this->photoReport ? $this->photoReport->id : null;
     }
 
-    public function equipmentTemplate()
+    public function equipmentTemplate(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\EquipmentTemplate::class, 'equipment_template_id');
+        return $this->belongsTo(EquipmentTemplate::class, 'equipment_template_id');
     }
 
     public function getRouteKeyName()
     {
         return 'report_id';
     }
+
+    private function countPhotoReportImages($photoReport): int
+        {
+            if (!$photoReport) return 0;
+
+            // report_data might be JSON string OR already array
+            $data = $photoReport->report_data;
+
+            if (is_string($data)) {
+                $data = json_decode($data, true);
+            }
+
+            if (!is_array($data)) return 0;
+
+            $items = $data['items'] ?? [];
+            if (!is_array($items)) return 0;
+
+            // count only items that have "image"
+            return collect($items)
+                ->filter(fn ($it) => !empty($it['image']))
+                ->count();
+        }
+
+
 }
+
+

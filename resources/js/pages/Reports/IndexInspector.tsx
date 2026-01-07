@@ -1,17 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
-import { useState } from 'react';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  Edit, 
-  Filter, 
-  Search, 
-  Calendar, 
-  User, 
-  BarChart3,
+import { useMemo, useState } from 'react';
+import {
+  FileText,
+  Eye,
+  Edit,
+  Search,
+  Calendar,
+  User,
   Clock,
   CheckCircle,
   XCircle,
@@ -23,553 +20,538 @@ import {
   RefreshCw,
   Grid3x3,
   List,
-  ChevronDown,
-  AlertTriangle
 } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'My Reports',
-        href: '/reports',
-    },
+  {
+    title: 'My Reports',
+    href: '/reports',
+  },
 ];
 
+type Status = 'draft' | 'submitted' | 'approved' | 'rejected';
+
 interface Report {
-    id: string;
-    title: string;
-    equipment: string;
-    equipmentTag: string;
-    status: 'draft' | 'submitted' | 'approved' | 'rejected';
-    createdBy: string;
-    createdAt: string;
-    lastUpdated: string;
-    reviewer: string;
-    dueDate: string;
-    attachments: number;
+  report_id: number;
+  title: string;
+
+  // mapped by controller
+  equipmentType?: string | null;
+  equipmentTag?: string | null;
+
+  status: Status;
+
+  createdBy: string;
+  creation_date: string; // "Y-m-d"
+  updated_at: string; // "diffForHumans" string
+
+  reviewer: string;
+
+  // optional (if you map later)
+  dueDate?: string | null;
+  attachments?: number | null;
+
+  hasPhotoReport?: boolean;
+  photoReportId?: number | null;
 }
 
-export default function Report() {
-    const [activeTab, setActiveTab] = useState<'all' | 'draft' | 'submitted' | 'approved'>('all');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-    
-    const reports: Report[] = [
-        {
-            id: 'RPT-2025-001',
-            title: 'Pressure Vessel Inspection - V-101',
-            equipment: 'Pressure Vessel',
-            equipmentTag: 'V-101',
-            status: 'approved',
-            createdBy: 'You',
-            createdAt: '2025-01-15',
-            lastUpdated: '2 hours ago',
-            reviewer: 'Jane Smith',
-            dueDate: '2025-01-20',
-            attachments: 3,
-        },
-        {
-            id: 'RPT-2025-002',
-            title: 'Heat Exchanger Maintenance Report',
-            equipment: 'Heat Exchanger',
-            equipmentTag: 'HE-205',
-            status: 'approved',
-            createdBy: 'You',
-            createdAt: '2025-01-14',
-            lastUpdated: '5 hours ago',
-            reviewer: 'Sarah Lee',
-            dueDate: '2025-01-18',
-            attachments: 5,
-        },
-        {
-            id: 'RPT-2025-003',
-            title: 'Reactor Safety Inspection',
-            equipment: 'Reactor',
-            equipmentTag: 'R-301',
-            status: 'draft',
-            createdBy: 'You',
-            createdAt: '2025-01-13',
-            lastUpdated: '1 day ago',
-            reviewer: 'Not Assigned',
-            dueDate: '2025-01-17',
-            attachments: 2,
-        },
-        {
-            id: 'RPT-2025-004',
-            title: 'Separator Performance Analysis',
-            equipment: 'Separator',
-            equipmentTag: 'S-110',
-            status: 'rejected',
-            createdBy: 'You',
-            createdAt: '2025-01-12',
-            lastUpdated: '2 days ago',
-            reviewer: 'Lisa Wang',
-            dueDate: '2025-01-16',
-            attachments: 4,
-        },
-        {
-            id: 'RPT-2025-005',
-            title: 'Accumulator Pressure Test',
-            equipment: 'Accumulator',
-            equipmentTag: 'A-402',
-            status: 'submitted',
-            createdBy: 'You',
-            createdAt: '2025-01-11',
-            lastUpdated: '3 days ago',
-            reviewer: 'Mark Davis',
-            dueDate: '2025-01-15',
-            attachments: 3,
-        },
-        {
-            id: 'RPT-2025-006',
-            title: 'Nitrogen Vessel Inspection',
-            equipment: 'Storage Vessel',
-            equipmentTag: 'N-550',
-            status: 'submitted',
-            createdBy: 'You',
-            createdAt: '2024-12-20',
-            lastUpdated: '2 weeks ago',
-            reviewer: 'John Doe',
-            dueDate: '2024-12-30',
-            attachments: 6,
-        },
-    ];
+interface Stats {
+  total: number;
+  draft: number;
+  submitted: number;
+  approved: number;
+  rejected: number;
+}
 
-    const filteredReports = reports.filter(report => {
-        if (activeTab !== 'all' && report.status !== activeTab) return false;
-        if (searchQuery) {
-            return report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                   report.equipment.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                   report.equipmentTag.toLowerCase().includes(searchQuery.toLowerCase());
-        }
-        return true;
+interface Filters {
+  status?: string;
+  search?: string;
+}
+
+export default function Report({
+  reports,
+  stats,
+  filters,
+}: {
+  reports: Report[];
+  stats: Stats;
+  filters?: Filters;
+}) {
+  const [activeTab, setActiveTab] = useState<'all' | 'draft' | 'submitted' | 'approved'>(
+    (filters?.status as any) || 'all'
+  );
+  const [searchQuery, setSearchQuery] = useState(filters?.search || '');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+  const filteredReports = useMemo(() => {
+    return (reports || []).filter((report) => {
+      if (activeTab !== 'all' && report.status !== activeTab) return false;
+
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+
+        return (
+          (report.title || '').toLowerCase().includes(q) ||
+          (report.equipmentType || '').toLowerCase().includes(q) ||
+          (report.equipmentTag || '').toLowerCase().includes(q)
+        );
+      }
+
+      return true;
     });
+  }, [reports, activeTab, searchQuery]);
 
-    const stats = {
-        total: reports.length,
-        draft: reports.filter(r => r.status === 'draft').length,
-        submitted: reports.filter(r => r.status === 'submitted').length,
-        approved: reports.filter(r => r.status === 'approved').length,
-        rejected: reports.filter(r => r.status === 'rejected').length,
-    };
+  const getStatusColor = (status: Status) => {
+    switch (status) {
+      case 'draft':
+        return 'bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700';
+      case 'submitted':
+        return 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/30';
+      case 'approved':
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/30';
+      case 'rejected':
+        return 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/30';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    }
+  };
 
-    const getStatusColor = (status: Report['status']) => {
-        switch (status) {
-            case 'draft': return 'bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700';
-            case 'submitted': return 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/30';
-            case 'approved': return 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/30';
-            case 'rejected': return 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/30';
-            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-        }
-    };
+  const getStatusIcon = (status: Status) => {
+    switch (status) {
+      case 'draft':
+        return <Edit className="h-3.5 w-3.5" />;
+      case 'submitted':
+        return <Upload className="h-3.5 w-3.5" />;
+      case 'approved':
+        return <CheckCircle className="h-3.5 w-3.5" />;
+      case 'rejected':
+        return <XCircle className="h-3.5 w-3.5" />;
+      default:
+        return <FileText className="h-3.5 w-3.5" />;
+    }
+  };
 
-    const getStatusIcon = (status: Report['status']) => {
-        switch (status) {
-            case 'draft': return <Edit className="h-3.5 w-3.5" />;
-            case 'submitted': return <Upload className="h-3.5 w-3.5" />;
-            case 'approved': return <CheckCircle className="h-3.5 w-3.5" />;
-            case 'rejected': return <XCircle className="h-3.5 w-3.5" />;
-            default: return <FileText className="h-3.5 w-3.5" />;
-        }
-    };
+  const getStatusBg = (status: Status) => {
+    switch (status) {
+      case 'draft':
+        return 'bg-gray-500';
+      case 'submitted':
+        return 'bg-blue-500';
+      case 'approved':
+        return 'bg-emerald-500';
+      case 'rejected':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
 
-    const getStatusBg = (status: Report['status']) => {
-        switch (status) {
-            case 'draft': return 'bg-gray-500';
-            case 'submitted': return 'bg-blue-500';
-            case 'approved': return 'bg-emerald-500';
-            case 'rejected': return 'bg-red-500';
-            default: return 'bg-gray-500';
-        }
-    };
+  return (
+    <AppLayout breadcrumbs={breadcrumbs}>
+      <Head title="My Reports - iPETRO" />
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Reports - iPETRO" />
-
-            <div className="px-6 py-6 bg-gradient-to-br from-gray-50 via-white to-gray-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/50 min-h-screen">
-                {/* Header Section */}
-                <div className="mb-8">
-                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-                        <div>
-                            <div className="flex items-center gap-3 mb-3">
-                                <div>
-                                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                                        Inspection Reports
-                                    </h1>
-                                    <p className="mt-1.5 text-gray-600 dark:text-gray-400 text-lg">
-                                        Create, manage, and track all your inspection reports
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-gray-900 text-white dark:bg-gray-800' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'}`}
-                                >
-                                    <List className="h-4 w-4" />
-                                    List
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all ${viewMode === 'grid' ? 'bg-gray-900 text-white dark:bg-gray-800' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'}`}
-                                >
-                                    <Grid3x3 className="h-4 w-4" />
-                                    Grid
-                                </button>
-                            </div>
-                            <Link
-                                href="/pv-report"
-                                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800 hover:shadow-lg hover:shadow-red-500/25 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md"
-                            >
-                                <Plus className="h-4 w-4" />
-                                New Report
-                            </Link>
-                        </div>
-                    </div>
+      <div className="px-6 py-6 bg-gradient-to-br from-gray-50 via-white to-gray-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/50 min-h-screen">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                    Inspection Reports
+                  </h1>
+                  <p className="mt-1.5 text-gray-600 dark:text-gray-400 text-lg">
+                    Create, manage, and track all your inspection reports
+                  </p>
                 </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Total Reports</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
-                            </div>
-                            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Drafts</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.draft}</p>
-                            </div>
-                            <div className="p-2.5 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
-                                <Edit className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Submitted</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.submitted}</p>
-                            </div>
-                            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                                <Upload className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Approved</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.approved}</p>
-                            </div>
-                            <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg">
-                                <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Main Content Card */}
-                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg overflow-hidden mb-8">
-                    {/* Header with Filters */}
-                    <div className="border-b border-gray-200 dark:border-gray-800 p-6">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                            {/* Status Tabs on Left */}
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => setActiveTab('all')}
-                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${activeTab === 'all'
-                                            ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                                        }`}
-                                >
-                                    <FileText className="h-4 w-4" />
-                                    All Reports
-                                    <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                                        {stats.total}
-                                    </span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('draft')}
-                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${activeTab === 'draft'
-                                            ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-md'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                                        }`}
-                                >
-                                    <Edit className="h-4 w-4" />
-                                    Drafts
-                                    <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                                        {stats.draft}
-                                    </span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('submitted')}
-                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${activeTab === 'submitted'
-                                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/25'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                                        }`}
-                                >
-                                    <Upload className="h-4 w-4" />
-                                    Submitted
-                                    <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                                        {stats.submitted}
-                                    </span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('approved')}
-                                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${activeTab === 'approved'
-                                            ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-500/25'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                                        }`}
-                                >
-                                    <CheckCircle className="h-4 w-4" />
-                                    Approved
-                                    <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                                        {stats.approved}
-                                    </span>
-                                </button>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <div className="relative w-full sm:w-80 lg:w-96">
-                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search reports..."
-                                        className="w-full rounded-xl border border-gray-300 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 py-2.5 pl-10 pr-4 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:focus:ring-red-500/30 dark:text-white transition-colors"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Reports List/Grid View */}
-                    <div className="p-6">
-                        {viewMode === 'grid' ? (
-                            /* Grid View */
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {filteredReports.map((report) => (
-                                    <div key={report.id} className="group bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200">
-                                        {/* Header */}
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${getStatusBg(report.status)}`}>
-                                                {getStatusIcon(report.status)}
-                                            </div>
-                                            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                            </button>
-                                        </div>
-
-                                        {/* Report Details */}
-                                        <div className="mb-5">
-                                            <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2">
-                                                {report.title}
-                                            </h4>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <HardHat className="h-4 w-4 text-gray-400" />
-                                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                    {report.equipment} • {report.equipmentTag}
-                                                </span>
-                                            </div>
-                                            <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(report.status)}`}>
-                                                {getStatusIcon(report.status)}
-                                                {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-                                            </div>
-                                        </div>
-
-                                        {/* Metadata */}
-                                        <div className="space-y-3 mb-6">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                                    <User className="h-3.5 w-3.5" />
-                                                    <span>{report.createdBy}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                                    <FolderOpen className="h-3.5 w-3.5" />
-                                                    <span>{report.attachments} files</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between text-sm">
-                                                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                                    <Calendar className="h-3.5 w-3.5" />
-                                                    <span>Due: {report.dueDate}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                                    <Clock className="h-3.5 w-3.5" />
-                                                    <span>{report.lastUpdated}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
-                                            <Link
-                                                href={`/reports/${report.id}`}
-                                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                                View
-                                            </Link>
-                                            <Link
-                                                href={`/reports/${report.id}/edit`}
-                                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                                Edit
-                                            </Link>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            /* List View */
-                            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 dark:bg-gray-800/50">
-                                        <tr>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                                Report Details
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                                Status
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                                Date
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        {filteredReports.map((report) => (
-                                            <tr key={report.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-start gap-4">
-                                                        <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${getStatusBg(report.status)}`}>
-                                                            {getStatusIcon(report.status)}
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <h4 className="font-semibold text-gray-900 dark:text-white">
-                                                                    {report.title}
-                                                                </h4>
-                                                            </div>
-                                                            <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                                                                <div className="flex items-center gap-1">
-                                                                    <HardHat className="h-3.5 w-3.5" />
-                                                                    <span>{report.equipment} • {report.equipmentTag}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <User className="h-3.5 w-3.5" />
-                                                                    <span>{report.createdBy}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <FolderOpen className="h-3.5 w-3.5" />
-                                                                    <span>{report.attachments} files</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                                Reviewer: {report.reviewer}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(report.status)}`}>
-                                                        {getStatusIcon(report.status)}
-                                                        {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="space-y-1">
-                                                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                            {report.createdAt}
-                                                        </div>
-                                                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                                            <Clock className="h-3 w-3" />
-                                                            Updated {report.lastUpdated}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-1">
-                                                        <Link
-                                                            href={`/reports/${report.id}`}
-                                                            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
-                                                        >
-                                                            <Eye className="h-3.5 w-3.5" />
-                                                            View
-                                                        </Link>
-                                                        <Link
-                                                            href={`/reports/${report.id}/edit`}
-                                                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
-                                                        >
-                                                            <Edit className="h-3.5 w-3.5" />
-                                                            Edit
-                                                        </Link>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-
-                                {/* Empty State */}
-                                {filteredReports.length === 0 && (
-                                    <div className="p-16 text-center">
-                                        <div className="inline-flex p-4 bg-gray-100 dark:bg-gray-800 rounded-2xl mb-4">
-                                            <FileText className="h-12 w-12 text-gray-400" />
-                                        </div>
-                                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                                            No reports found
-                                        </h3>
-                                        <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                                            {searchQuery ? 'Try adjusting your search terms to find what you\'re looking for.' : 'Get started by creating your first inspection report.'}
-                                        </p>
-                                        {!searchQuery && (
-                                            <Link
-                                                href="/pv-report"
-                                                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 px-5 py-3 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800 hover:shadow-lg hover:shadow-red-500/25"
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                                Create New Report
-                                            </Link>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Bottom Actions */}
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Showing {filteredReports.length} of {reports.length} reports
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <RefreshCw className="h-4 w-4" />
-                            Refresh
-                        </button>
-                    </div>
-                </div>
+              </div>
             </div>
-        </AppLayout>
-    );
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all ${
+                    viewMode === 'list'
+                      ? 'bg-gray-900 text-white dark:bg-gray-800'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <List className="h-4 w-4" />
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all ${
+                    viewMode === 'grid'
+                      ? 'bg-gray-900 text-white dark:bg-gray-800'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                  Grid
+                </button>
+              </div>
+              <Link
+                href="/pv-report"
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800 hover:shadow-lg hover:shadow-red-500/25 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md"
+              >
+                <Plus className="h-4 w-4" />
+                New Report
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Total Reports</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+              </div>
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Drafts</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.draft}</p>
+              </div>
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
+                <Edit className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Submitted</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.submitted}</p>
+              </div>
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <Upload className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Approved</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.approved}</p>
+              </div>
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Card */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg overflow-hidden mb-8">
+          {/* Header with Filters */}
+          <div className="border-b border-gray-200 dark:border-gray-800 p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              {/* Status Tabs on Left */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'all'
+                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  All Reports
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.total}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('draft')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'draft'
+                      ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Edit className="h-4 w-4" />
+                  Drafts
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.draft}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('submitted')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'submitted'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/25'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Upload className="h-4 w-4" />
+                  Submitted
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.submitted}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('approved')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'approved'
+                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-500/25'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Approved
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.approved}</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative w-full sm:w-80 lg:w-96">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search reports..."
+                    className="w-full rounded-xl border border-gray-300 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 py-2.5 pl-10 pr-4 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:focus:ring-red-500/30 dark:text-white transition-colors"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Reports List/Grid View */}
+          <div className="p-6">
+            {viewMode === 'grid' ? (
+              /* Grid View */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredReports.map((report) => (
+                  <div
+                    key={report.report_id}
+                    className="group bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${getStatusBg(report.status)}`}>
+                        {getStatusIcon(report.status)}
+                      </div>
+                      <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      </button>
+                    </div>
+
+                    {/* Report Details */}
+                    <div className="mb-5">
+                      <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2">{report.title}</h4>
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <HardHat className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {report.equipmentType ?? '-'} • {report.equipmentTag ?? '-'}
+                        </span>
+                      </div>
+
+                      <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(report.status)}`}>
+                        {getStatusIcon(report.status)}
+                        {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                      </div>
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <User className="h-3.5 w-3.5" />
+                          <span>{report.createdBy}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <FolderOpen className="h-3.5 w-3.5" />
+                          <span>{report.attachments ?? 0} files</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>Due: {report.dueDate ?? '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>{report.updated_at}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <Link
+                        href={`/reports/${report.report_id}`}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </Link>
+                      <Link
+                        href={`/reports/${report.report_id}/edit`}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* List View */
+              <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-800/50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Report Details
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Date
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {filteredReports.map((report) => (
+                      <tr key={report.report_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-start gap-4">
+                            <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${getStatusBg(report.status)}`}>
+                              {getStatusIcon(report.status)}
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-gray-900 dark:text-white">{report.title}</h4>
+                              </div>
+
+                              <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center gap-1">
+                                  <HardHat className="h-3.5 w-3.5" />
+                                  <span>
+                                    {report.equipmentType ?? '-'} • {report.equipmentTag ?? '-'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <User className="h-3.5 w-3.5" />
+                                  <span>{report.createdBy}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <FolderOpen className="h-3.5 w-3.5" />
+                                  <span>{report.attachments ?? 0} files</span>
+                                </div>
+                              </div>
+
+                              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">Reviewer: {report.reviewer}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusColor(report.status)}`}>
+                            {getStatusIcon(report.status)}
+                            {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                            <div className="space-y-1">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                {report.createdAt ?? '—'}
+                                </div>
+
+                                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                <Clock className="h-3 w-3" />
+                                Updated {report.lastUpdated ?? '—'}
+                                </div>
+                            </div>
+                            </td>
+
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1">
+                            <Link
+                              href={`/reports/${report.report_id}`}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </Link>
+                            <Link
+                              href={`/reports/${report.report_id}/edit`}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                              Edit
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Empty State */}
+                {filteredReports.length === 0 && (
+                  <div className="p-16 text-center">
+                    <div className="inline-flex p-4 bg-gray-100 dark:bg-gray-800 rounded-2xl mb-4">
+                      <FileText className="h-12 w-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No reports found</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                      {searchQuery ? "Try adjusting your search terms to find what you're looking for." : 'Get started by creating your first inspection report.'}
+                    </p>
+                    {!searchQuery && (
+                      <Link
+                        href="/pv-report"
+                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 px-5 py-3 text-sm font-semibold text-white transition-all hover:from-red-700 hover:to-red-800 hover:shadow-lg hover:shadow-red-500/25"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Create New Report
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {filteredReports.length} of {reports.length} reports
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all hover:bg-gray-50 dark:hover:bg-gray-700">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+    </AppLayout>
+  );
 }

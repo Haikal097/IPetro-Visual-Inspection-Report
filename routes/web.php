@@ -63,15 +63,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     Route::get('/reports/create', [ReportController::class, 'create'])->name('reports.create');
 
-    // ✅ Your existing main report UI route
+    // ✅ Your existing main report UI route (keep as-is)
     Route::get('/report', function () {
         return inertia('Reports/IndexInspector');
     })->name('reports.inspector.index');
 
-    // ✅ FIX ADDED: /reports should also show main report UI (doesn't change anything else)
-    Route::get('/reports', function () {
-        return inertia('Reports/IndexInspector');
-    })->name('reports.index');
+    // ✅ FIX: only ONE /reports route (use controller so it has DB stats + reports)
+    Route::get('/reports', [ReportController::class, 'reportsPage'])->name('reports.page');
 
     // Create new PV report
     Route::get('/pv-report', function () {
@@ -166,8 +164,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Printable view
     Route::get('/reports/photo-report/print', function () {
-        // Retrieve print data from session storage
-        // This is handled by the frontend, but you might want to load from DB
         return Inertia::render('PhotoReportPrint');
     })->name('photo-report.print');
 
@@ -197,14 +193,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['auth'])->group(function () {
         // Review dashboard
         Route::get('/review', [ReviewerController::class, 'indexReviewer'])->name('reports.reviewer');
-        
+
         // Individual report review
         Route::get('/review/report/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
-        
+
         // Additional review routes (optional)
         Route::get('/reports/{report}/compare', [ReviewerController::class, 'compare'])->name('reports.compare');
         Route::get('/reports/{report}/comments', [ReviewerController::class, 'comments'])->name('reports.comments');
-        
+
         // Review actions
         Route::post('/reports/{report}/approve', [ReviewerController::class, 'approve'])->name('reports.approve');
         Route::post('/reports/{report}/reject', [ReviewerController::class, 'reject'])->name('reports.reject');
