@@ -28,6 +28,12 @@ export default function ShowReview({ report }: { report: any }) {
   const { props } = usePage();
   const user = props.auth?.user;
   const canUserReview = ['reviewer', 'admin', 'supervisor'].includes(user?.role);
+  const currentUserSignature = props.auth?.signatureUrl;
+
+  // From report
+  const inspectorSignature = report.inspector_signature_url; // Report creator (inspector)
+  const reviewerSignature = report.reviewer_signature_url; // Reviewer signature
+
   // ✅ IMPORTANT: some payloads use report_id instead of id
   const reportId = report?.id ?? report?.report_id;
 
@@ -52,46 +58,51 @@ export default function ShowReview({ report }: { report: any }) {
   };
 
   const handlePrintPhotoReport = () => {
-    const rd = report.report_data || {}; // PV form JSON
+      const rd = report.report_data || {};
+      const firstPhotoReport = report.photo_reports?.[0] ?? null;
 
-    const firstPhotoReport = report.photo_reports?.[0] ?? null;
+      const printData = {
+          title: report.title,
+          reportNo: rd.reportNo || report.report_number,
+          reportDate: rd.reportDate || report.created_at,
 
-    const printData = {
-      title: report.title,
-      reportNo: rd.reportNo || report.report_number,
-      reportDate: rd.reportDate || report.created_at,
+          equipmentTag: rd.equipmentTag,
+          equipmentDescription: rd.equipmentDescription,
+          equipmentType: rd.equipmentType,
+          plantUnitArea: rd.plantUnitArea,
+          doshRegistration: rd.doshRegistration,
 
-      equipmentTag: rd.equipmentTag,
-      equipmentDescription: rd.equipmentDescription,
-      equipmentType: rd.equipmentType,
-      plantUnitArea: rd.plantUnitArea,
-      doshRegistration: rd.doshRegistration,
+          initialFinding: rd.initialFinding,
+          externalFinding: rd.externalFinding,
+          internalFinding: rd.internalFinding,
 
-      initialFinding: rd.initialFinding,
-      externalFinding: rd.externalFinding,
-      internalFinding: rd.internalFinding,
+          ndt: rd.ndt,
+          recommendations: rd.recommendations,
 
-      ndt: rd.ndt,
-      recommendations: rd.recommendations,
+          inspectorName: rd.inspectorName || report.creator?.name,
+          publishDate: rd.publishDate,
 
-      inspectorName: rd.inspectorName || report.creator?.name,
-      publishDate: rd.publishDate,
+          // ✅ Inspector signature (report creator)
+          inspectorSignatureUrl: report.inspector_signature_url || null,
+          
+          // ✅ Reviewer signature (current user - for approval section)
+          reviewerSignatureUrl: report.reviewer_signature_url || null,
+          
+          reviewerName: user?.name || null, // Current user name
 
-      signatureUrl: report.signature_snapshot_url || report.signatureUrl || null, // adjust to your backend prop
+          photoReport: firstPhotoReport,
 
-      photoReport: firstPhotoReport,
+          items: report.photo_report_items?.map((item: any) => ({
+              id: item.id,
+              title: item.title,
+              findings: item.findings,
+              requirements: item.requirements,
+              image: item.image,
+          })) || [],
+      };
 
-      items: report.photo_report_items?.map((item: any) => ({
-        id: item.id,
-        title: item.title,
-        findings: item.findings,
-        requirements: item.requirements,
-        image: item.image,
-      })) || [],
-    };
-
-    setPrintData(printData);
-    setShowPrintPreview(true);
+      setPrintData(printData);
+      setShowPrintPreview(true);
   };
 
 

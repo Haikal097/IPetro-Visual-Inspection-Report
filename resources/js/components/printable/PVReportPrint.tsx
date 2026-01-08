@@ -31,10 +31,11 @@ type PrintData = {
   inspectorName?: string;
   publishDate?: string;
 
-  signatureUrl?: string | null;
-
-  // For reviewer display (optional)
+  inspectorSignatureUrl?: string | null;
+  reviewerSignatureUrl?: string | null;
   reviewerName?: string | null;
+
+  signatureUrl?: string | null;
 
   // Photo report header fields (optional)
   photoReport?: {
@@ -634,8 +635,8 @@ export default function PVReportPrint({
                 Inspector Signature
               </th>
               <td style={{ border: "1px solid #000", padding: "6px", height: "50px" }}>
-                {data.signatureUrl ? (
-                  <img src={data.signatureUrl} style={{ height: "40px", objectFit: "contain" }} alt="Inspector Signature" />
+                {data.inspectorSignatureUrl ? (
+                  <img src={data.inspectorSignatureUrl} style={{ height: "40px", objectFit: "contain" }} alt="Inspector Signature" />
                 ) : (
                   "______________________"
                 )}
@@ -669,25 +670,40 @@ export default function PVReportPrint({
 
             <div style={{ marginBottom: "20px", padding: "15px", border: "1px solid #ddd", backgroundColor: "#f9f9f9", borderRadius: "4px", minHeight: "80px" }} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>DOSH Officer Name</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
+                <div>
+                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerName || ""}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerSignatureUrl ? (
+                      <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
+                    ) : null}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {/* ✅ AUTO-FILL TODAY'S DATE */}
+                    {(() => {
+                      const today = new Date();
+                      const day = String(today.getDate()).padStart(2, '0');
+                      const month = String(today.getMonth() + 1).padStart(2, '0');
+                      const year = today.getFullYear();
+                      return `${day}/${month}/${year}`;
+                    })()}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                </div>
               </div>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Officer Signature</p>
-              </div>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
-              </div>
-            </div>
           </div>
-
+          {/* (MOVED OUT - NOT APPLICABLE FOR PV REPORT)??
           <div style={{ marginBottom: "20px", paddingTop: "20px", borderTop: "1px dashed #ccc" }}>
             <h4 style={{ fontSize: "11pt", fontWeight: "bold", margin: "0 0 15px 0", color: "#333" }}>
               Action taken by Plant on recommendation (if applicable):
@@ -695,24 +711,30 @@ export default function PVReportPrint({
 
             <div style={{ marginBottom: "20px", padding: "15px", border: "1px solid #ddd", backgroundColor: "#f9f9f9", borderRadius: "4px", minHeight: "80px" }} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Plant Manager Name</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
+                <div>
+                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerName || ""}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerSignatureUrl ? (
+                      <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
+                    ) : null}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                </div>
               </div>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Manager Signature</p>
-              </div>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
-              </div>
-            </div>
-          </div>
+          </div>*/}
         </div>
         </div> {/* End of page break wrapper */}
 
@@ -865,17 +887,32 @@ export default function PVReportPrint({
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
                 <div>
                   <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>DOSH Officer Name</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerName || ""}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
                 </div>
                 <div>
                   <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Officer Signature</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerSignatureUrl ? (
+                      <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
+                    ) : null}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
                 </div>
                 <div>
                   <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {/* ✅ AUTO-FILL TODAY'S DATE */}
+                    {(() => {
+                      const today = new Date();
+                      const day = String(today.getDate()).padStart(2, '0');
+                      const month = String(today.getMonth() + 1).padStart(2, '0');
+                      const year = today.getFullYear();
+                      return `${day}/${month}/${year}`;
+                    })()}
+                  </div>
                   <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
                 </div>
               </div>
@@ -891,19 +928,34 @@ export default function PVReportPrint({
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
                 <div>
                   <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Plant Manager Name</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerName || ""}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
                 </div>
                 <div>
                   <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Manager Signature</p>
+                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                    {data.reviewerSignatureUrl ? (
+                      <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
+                    ) : null}
+                  </div>
+                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
                 </div>
-                <div>
-                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }} />
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
-                </div>
+                  <div>
+                    <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
+                    <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                      {/* ✅ AUTO-FILL TODAY'S DATE */}
+                      {(() => {
+                        const today = new Date();
+                        const day = String(today.getDate()).padStart(2, '0');
+                        const month = String(today.getMonth() + 1).padStart(2, '0');
+                        const year = today.getFullYear();
+                        return `${day}/${month}/${year}`;
+                      })()}
+                    </div>
+                    <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                  </div>
               </div>
             </div>
           </div>

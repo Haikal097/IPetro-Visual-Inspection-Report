@@ -460,6 +460,21 @@ class ReviewerController extends Controller
             'revisions_requested',
         ]);
 
+        // ✅ Get the current authenticated user
+        $user = Auth::user();
+        
+        // ✅ Build current user's signature URL if exists
+        $currentUserSignatureUrl = null;
+        if ($user && $user->signature_path) {
+            $currentUserSignatureUrl = asset('storage/' . $user->signature_path);
+        }
+
+        // ✅ Get the report creator's signature URL (inspector)
+        $creatorSignatureUrl = null;
+        if ($report->creator && $report->creator->signature_path) {
+            $creatorSignatureUrl = asset('storage/' . $report->creator->signature_path);
+        }
+
         $jsonData = [];
         if ($report->json_data) {
             try {
@@ -490,10 +505,8 @@ class ReviewerController extends Controller
             }
         }
 
-        // ✅ FIX (necessary): use report->getKey() not report->id
         $reportNumber = $jsonData['reportNo'] ?? 'RPT-' . $report->getKey();
 
-        // ✅ ADDED (necessary for showing reviewer comment/history in UI if you want)
         $reviewLogs = ReportReviewLog::where('report_id', $report->getKey())
             ->orderByDesc('created_at')
             ->get()
@@ -533,6 +546,13 @@ class ReviewerController extends Controller
                 'reviewer_id' => $report->reviewer_id,
                 'creator_id' => $report->creator_id,
                 'inspector_id' => $report->inspector_id,
+                
+                // ✅ Inspector signature (report creator)
+                'inspector_signature_url' => $creatorSignatureUrl,
+                
+                // ✅ Reviewer signature (current user - for reference)
+                'reviewer_signature_url' => $currentUserSignatureUrl,
+                
                 'submission_date' => $report->submission_date?->format('Y-m-d H:i:s'),
                 'signed_at' => $report->signed_at?->format('Y-m-d H:i:s'),
 
@@ -562,14 +582,13 @@ class ReviewerController extends Controller
                 }),
 
                 'photo_report_items' => $allPhotoItems,
-
-                // ✅ ADDED (optional but necessary if you want to show logs)
                 'review_logs' => $reviewLogs,
             ],
             
-            // ✅ ADD THIS LINE to pass auth data
+            // ✅ Auth should be at the TOP LEVEL (not inside report)
             'auth' => [
-                'user' => Auth::user()
+                'user' => $user,
+                'signatureUrl' => $currentUserSignatureUrl
             ]
         ]);
     }
