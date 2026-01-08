@@ -1,7 +1,7 @@
 // Inspector and Reviewer - Show Single Report Details Page
 
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import PhotoReportPrint from '@/components/printable/PhotoReportPrint';
 import PVReportPrint from '@/components/printable/PVReportPrint';
@@ -25,6 +25,9 @@ import {
 
 export default function ShowReview({ report }: { report: any }) {
 
+  const { props } = usePage();
+  const user = props.auth?.user;
+  const canUserReview = ['reviewer', 'admin', 'supervisor'].includes(user?.role);
   // ✅ IMPORTANT: some payloads use report_id instead of id
   const reportId = report?.id ?? report?.report_id;
 
@@ -676,7 +679,7 @@ export default function ShowReview({ report }: { report: any }) {
             </div>
 
               {/* Actions Panel */}
-              {canReview && report.status !== 'revisions_requested' && (
+              {canUserReview && canReview && report.status !== 'revisions_requested' && (
                 <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     Review Actions

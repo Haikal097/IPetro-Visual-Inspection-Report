@@ -566,6 +566,11 @@ class ReviewerController extends Controller
                 // ✅ ADDED (optional but necessary if you want to show logs)
                 'review_logs' => $reviewLogs,
             ],
+            
+            // ✅ ADD THIS LINE to pass auth data
+            'auth' => [
+                'user' => Auth::user()
+            ]
         ]);
     }
 
