@@ -239,7 +239,7 @@ export default function NotificationBell() {
                       {/* optional quick link */}
                       {(n.url || n.report_id || n.inspection_id) && (
                         <span className="text-xs font-semibold text-red-600 hover:underline">
-                          Open
+                          Review
                         </span>
                       )}
                     </div>
@@ -284,11 +284,12 @@ export default function NotificationBell() {
             )}
           </div>
 
-          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            {/* ✅ ADDED: role-based footer links */}
-            <Link href="/inspection-calendar" className="text-sm font-semibold text-red-600 hover:underline">
-              Calendar
-            </Link>
+          <div className={`px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center ${isReviewer ? "justify-end" : "justify-between"}`}>
+            {!isReviewer && (
+              <Link href="/inspection-calendar" className="text-sm font-semibold text-red-600 hover:underline">
+                Calendar
+              </Link>
+            )}
 
             {isReviewer ? (
               <Link href="/review" className="text-sm font-semibold text-red-600 hover:underline">
