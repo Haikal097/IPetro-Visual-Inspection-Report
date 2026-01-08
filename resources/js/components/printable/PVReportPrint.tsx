@@ -66,18 +66,12 @@ export default function PVReportPrint({
   };
 
   useEffect(() => {
-    // auto print on load
-    setTimeout(() => window.print(), 200);
-  }, []);
-
-  // after print, go back to review page
-  useEffect(() => {
     const onAfterPrint = () => {
-      router.visit(`/review/report/${reportId}`);
+      window.history.back(); // Native browser back navigation
     };
     window.addEventListener("afterprint", onAfterPrint);
     return () => window.removeEventListener("afterprint", onAfterPrint);
-  }, [reportId]);
+  }, []);
 
   const items = data.items ?? [];
 
@@ -360,7 +354,7 @@ export default function PVReportPrint({
             Print
           </button>
           <button
-            onClick={() => router.visit(`/review/report/${reportId}`)}
+            onClick={() => window.history.back()}
             className="px-4 py-2 rounded bg-gray-200 text-gray-800 text-sm font-semibold"
           >
             Back

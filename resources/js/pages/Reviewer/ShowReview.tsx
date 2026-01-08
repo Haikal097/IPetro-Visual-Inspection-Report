@@ -48,11 +48,6 @@ export default function ShowReview({ report }: { report: any }) {
     }
   };
 
-  const handleViewPhotoReport = () => {
-    if (!reportId) return alert('Missing reportId from backend (report.id/report.report_id is null)');
-    router.get(`/reports/photo-report?report_id=${reportId}`);
-  };
-
   const handlePrintPhotoReport = () => {
     const rd = report.report_data || {}; // PV form JSON
 
@@ -102,6 +97,7 @@ export default function ShowReview({ report }: { report: any }) {
   );
 
   const [currentStatus, setCurrentStatus] = useState(report.status);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const canReview = ['submitted', 'in_review'].includes(report.status);
 

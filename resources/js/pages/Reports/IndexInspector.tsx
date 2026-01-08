@@ -100,7 +100,7 @@ export default function Report({
   stats: Stats;
   filters?: Filters;
 }) {
-  const [activeTab, setActiveTab] = useState<'all' | 'draft' | 'submitted' | 'approved'>(
+  const [activeTab, setActiveTab] = useState<'all' | 'draft' | 'submitted' | 'approved' | 'rejected'>(
     (filters?.status as any) || 'all'
   );
   const [searchQuery, setSearchQuery] = useState(filters?.search || '');
@@ -427,7 +427,7 @@ export default function Report({
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
@@ -475,6 +475,19 @@ export default function Report({
               </div>
             </div>
           </div>
+
+          {/* ✅ ADDED: Rejected stats card */}
+          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Rejected</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.rejected || 0}</p>
+              </div>
+              <div className="p-2.5 bg-red-50 dark:bg-red-900/30 rounded-lg">
+                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Main Content Card */}
@@ -482,60 +495,84 @@ export default function Report({
           {/* Header with Filters */}
           <div className="border-b border-gray-200 dark:border-gray-800 p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              {/* Status Tabs on Left */}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setActiveTab('all')}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                    activeTab === 'all'
-                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <FileText className="h-4 w-4" />
-                  All Reports
-                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.total}</span>
-                </button>
+            {/* Status Tabs on Left */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                  activeTab === 'all'
+                    ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                All Reports
+                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                  {stats.total}
+                </span>
+              </button>
 
-                <button
-                  onClick={() => setActiveTab('draft')}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                    activeTab === 'draft'
-                      ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <Edit className="h-4 w-4" />
-                  Drafts
-                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.draft}</span>
-                </button>
+              <button
+                onClick={() => setActiveTab('draft')}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                  activeTab === 'draft'
+                    ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Edit className="h-4 w-4" />
+                Drafts
+                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                  {stats.draft}
+                </span>
+              </button>
 
-                <button
-                  onClick={() => setActiveTab('submitted')}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                    activeTab === 'submitted'
-                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/25'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <Upload className="h-4 w-4" />
-                  Submitted
-                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.submitted}</span>
-                </button>
+              <button
+                onClick={() => setActiveTab('submitted')}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                  activeTab === 'submitted'
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/25'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Upload className="h-4 w-4" />
+                Submitted
+                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                  {stats.submitted}
+                </span>
+              </button>
 
-                <button
-                  onClick={() => setActiveTab('approved')}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                    activeTab === 'approved'
-                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-500/25'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Approved
-                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{stats.approved}</span>
-                </button>
-              </div>
+              <button
+                onClick={() => setActiveTab('approved')}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                  activeTab === 'approved'
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-500/25'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                <CheckCircle className="h-4 w-4" />
+                Approved
+                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                  {stats.approved}
+                </span>
+              </button>
+
+              {/* ✅ ADDED: Rejected tab */}
+              <button
+                onClick={() => setActiveTab('rejected')}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                  activeTab === 'rejected'
+                    ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                <XCircle className="h-4 w-4" />
+                Rejected
+                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                  {stats.rejected || 0}
+                </span>
+              </button>
+            </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative w-full sm:w-80 lg:w-96">
@@ -636,19 +673,32 @@ export default function Report({
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
-                      <Link
-                        href={`/pv-report/${report.id}`}
-                        onClick={() => {
-                          console.log('🔗 Link clicked - ID:', report.id);
-                          console.log('🔗 Full href:', `/pv-report/${report.id}`);
-                        }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Link>
+                      {/* View Button with dynamic route based on status */}
+                      {(() => {
+                        // Determine the route based on status
+                        let viewRoute = `/pv-report/${report.id}`; // Default for draft/revisions_requested
+                        
+                        if (['approved', 'rejected', 'submitted', 'in_review'].includes(report.status)) {
+                          viewRoute = `/report/show/${report.id}`;
+                        }
+                        
+                        return (
+                          <Link
+                            href={viewRoute}
+                            onClick={() => {
+                              console.log('🔗 Link clicked - ID:', report.id);
+                              console.log('🔗 Status:', report.status);
+                              console.log('🔗 Full href:', viewRoute);
+                            }}
+                            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Link>
+                        );
+                      })()}
 
-                      {canEdit(report.status) && (
+                      {/*canEdit(report.status) && ( UNUSED EDIT BUTTON
                         <Link
                           href={`/reports/${report.id}/edit`}
                           className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
@@ -656,7 +706,7 @@ export default function Report({
                           <Edit className="h-4 w-4" />
                           Edit
                         </Link>
-                      )}
+                      )*/}
 
                       {report.status === 'revisions_requested' && (
                         <button
@@ -770,15 +820,27 @@ export default function Report({
 
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1">
-                            <Link
-                              href={`/pv-report/${report.id}`}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              View
-                            </Link>
+                            {/* ✅ UPDATED: Use dynamic routing for List View too */}
+                            {(() => {
+                              // Determine the route based on status
+                              let viewRoute = `/pv-report/${report.id}`; // Default for draft/revisions_requested
+                              
+                              if (['approved', 'rejected', 'submitted', 'in_review'].includes(report.status)) {
+                                viewRoute = `/report/show/${report.id}`;
+                              }
+                              
+                              return (
+                                <Link
+                                  href={viewRoute}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  View
+                                </Link>
+                              );
+                            })()}
 
-                            {canEdit(report.status) && (
+                            {/*canEdit(report.status) && ( UNUSED EDIT BUTTON
                               <Link
                                 href={`/reports/${report.id}/edit`}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
@@ -786,7 +848,7 @@ export default function Report({
                                 <Edit className="h-3.5 w-3.5" />
                                 Edit
                               </Link>
-                            )}
+                            )*/}
 
                             {/* ✅ ADDED: Resubmit button in List View */}
                             {report.status === 'revisions_requested' && (
