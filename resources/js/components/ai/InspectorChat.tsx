@@ -38,12 +38,15 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
 
     try {
       const { data } = await axios.post("/api/ai/inspector-chat", {
-        messages: next.filter(m => m.role !== "assistant" || m.content.trim() !== ""), // keep all
+        messages: next.filter((m) => m.content.trim() !== ""), // keep all non-empty
         context,
       });
 
-      if (!data?.ok) throw new Error(data?.error || "Chat failed");
+      // ✅ FIX: backend returns {success:true,...} OR {ok:true,...}
+      const isOk = data?.ok === true || data?.success === true;
+      if (!isOk) throw new Error(data?.error || "Chat failed");
 
+      // ✅ reply key is correct based on your Network preview
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
     } catch (e: any) {
       setMessages((prev) => [
@@ -73,10 +76,7 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
 
         <div className="max-h-[60vh] space-y-3 overflow-y-auto p-4">
           {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-            >
+            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                   m.role === "user"

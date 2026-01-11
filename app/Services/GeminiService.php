@@ -3,33 +3,32 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
+use RuntimeException;
 
 class GeminiService
 {
     public function generateText(string $prompt): string
     {
-        $apiKey = config('gemini.api_key');
-        $model = config('gemini.model');
-        $baseUrl = rtrim(config('gemini.base_url'), '/');
-        $timeout = config('gemini.timeout', 60);
+        $apiKey  = config('gemini.api_key') ?: env('AIzaSyBYxuqYvqn_FTzGK4wHF_6cQKlcRqRMJVY');
+        $model   = config('gemini.model') ?: env('GEMINI_MODEL', 'gemini-2.5-flash');
+        $baseUrl = config('gemini.base_url') ?: env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com');
+        $timeout = (int) (config('gemini.request_timeout') ?: env('GEMINI_TIMEOUT', 60));
 
         if (!$apiKey) {
-            throw new \RuntimeException('GEMINI_API_KEY is missing in .env');
+            throw new RuntimeException('GEMINI_API_KEY is missing in .env');
         }
 
-        $url = "{$baseUrl}/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        $url = rtrim($baseUrl, '/') . "/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         $payload = [
             'contents' => [
                 [
                     'role' => 'user',
                     'parts' => [
-                        ['text' => $prompt]
+                        ['text' => $prompt],
                     ],
                 ],
             ],
-            // Optional safety / generation controls
             'generationConfig' => [
                 'temperature' => 0.4,
                 'maxOutputTokens' => 1024,
@@ -41,14 +40,29 @@ class GeminiService
             ->asJson()
             ->post($url, $payload);
 
-        if (!$res->successful()) {
-            $msg = $res->json('error.message') ?? $res->body();
-            throw new \RuntimeException("Gemini API error: {$msg}");
+        if (!$res->ok()) {
+            $status = $res->status();
+            $raw = $res->body();
+
+            // try to read a helpful message if response is JSON
+            $json = null;
+            try { $json = $res->json(); } catch (\Throwable $e) {}
+
+            $msg =
+                (is_array($json) ? ($json['error']['message'] ?? $json['message'] ?? null) : null)
+                ?: $raw
+                ?: '(empty response body)';
+
+            throw new RuntimeException("Gemini API error (HTTP {$status}): {$msg}");
         }
 
-        // Extract model text output
-        $text = $res->json('candidates.0.content.parts.0.text');
+        $json = $res->json();
+        $text = $json['candidates'][0]['content']['parts'][0]['text'] ?? null;
 
-        return is_string($text) && Str::length($text) ? $text : 'No response from AI.';
+        if (!is_string($text) || trim($text) === '') {
+            return 'No response from AI.';
+        }
+
+        return trim($text);
     }
 }

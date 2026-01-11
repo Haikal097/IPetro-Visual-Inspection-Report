@@ -278,8 +278,9 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
         ->name('ai.pv-report-draft.generate.web');
 
     // inspector chat (choose one controller)
-    Route::post('/ai/inspector-chat', [InspectorAiController::class, 'chat'])
-        ->name('ai.inspector.chat');
+    Route::post('/ai/inspector-chat', [AiInspectorChatController::class, 'chat'])
+    ->name('ai.inspector-chat');
+
 
     // report analysis
     Route::post('/ai/report-analysis', [InspectorAiController::class, 'analyze'])
