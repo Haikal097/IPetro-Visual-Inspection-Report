@@ -44,11 +44,63 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
       submission_date: report?.submission_date,
       signed_at: report?.signed_at,
 
-      // IMPORTANT: your ShowReview uses report.report_data for findings
-      // We send json_data that backend service expects (it can accept array or string).
+      // ✅ IMPORTANT:
+      // Only PV report sections live here. We are NOT sending photos/items.
       json_data: report?.report_data ?? report?.json_data ?? {},
     };
   }, [report]);
+
+  // ✅ NEW: normalize backend response into the UI format your component expects
+  const normalize = (data: any): Result => {
+    // backend (current): { ok:true, review:{...} }
+    if (data?.ok === true && data?.review && typeof data.review === "object") {
+      const r = data.review;
+
+      return {
+        ok: true,
+        mode: "json",
+        confidence: r.confidence,
+        suggestedAction: r.suggestedAction,
+        topIssues: Array.isArray(r.topIssues) ? r.topIssues : [],
+        suggestedComments: r.suggestedReviewerComment
+          ? [{ title: "Suggested reviewer comment", text: String(r.suggestedReviewerComment) }]
+          : [],
+        flags: {
+          missingSections: Array.isArray(r.missingSections) ? r.missingSections : [],
+          emptySections: Array.isArray(r.emptySections) ? r.emptySections : [],
+          tooShortSections: Array.isArray(r.tooShortSections) ? r.tooShortSections : [],
+          missingMeta: Array.isArray(r.missingMetadata) ? r.missingMetadata : [],
+          consistencyIssues: Array.isArray(r.consistencyIssues) ? r.consistencyIssues : [],
+          riskFlags: Array.isArray(r.riskFlags) ? r.riskFlags : [],
+          severityScore: r.severityScore ?? 0,
+        },
+        notes: r,
+      };
+    }
+
+    // frontend shape (older/alternate): { ok:true, mode:"json", ... }
+    if (data?.ok === true && data?.mode === "json") {
+      return data as Result;
+    }
+
+    // error shape
+    if (data?.ok === false) {
+      return {
+        ok: false,
+        error: data?.error ?? "Request failed",
+        details: data?.details,
+        flags: data?.flags,
+      };
+    }
+
+    // fallback display
+    return {
+      ok: true,
+      mode: "fallback_text",
+      analysis_text: typeof data === "string" ? data : JSON.stringify(data, null, 2),
+      flags: data?.flags,
+    };
+  };
 
   const run = async () => {
     try {
@@ -60,7 +112,8 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
         report: safeReport,
       });
 
-      setRes(data);
+      // ✅ CHANGED: normalize before render
+      setRes(normalize(data));
     } catch (e: any) {
       const msg =
         e?.response?.data?.error ||
@@ -68,7 +121,9 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
         e?.message ||
         "Request failed";
       setError(msg);
-      setRes(e?.response?.data ?? null);
+
+      // ✅ CHANGED: normalize even error payload so UI doesn't break
+      setRes(normalize(e?.response?.data ?? { ok: false, error: msg }));
     } finally {
       setLoading(false);
     }
@@ -139,13 +194,13 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
             </span>
           </div>
 
-          {/* Scroll area */}
           <div className="max-h-[360px] overflow-y-auto space-y-4 pr-1">
-            {/* Top issues */}
             <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-3">
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">Top issues to fix</div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Top issues to fix
+                </div>
               </div>
 
               <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-200">
@@ -155,11 +210,12 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
               </ul>
             </div>
 
-            {/* Suggested comments */}
             <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">Suggested reviewer comments</div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Suggested reviewer comments
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -169,7 +225,9 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
                     className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">{c.title}</div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {c.title}
+                      </div>
 
                       <button
                         onClick={() => copy(c.text)}
@@ -189,7 +247,6 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
               </div>
             </div>
 
-            {/* Raw flags */}
             <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
               <div className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                 System flags (deterministic)
@@ -202,7 +259,9 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
 
       {res && (res as any).ok === true && (res as any).mode === "fallback_text" && (
         <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-3">
-          <div className="text-sm font-semibold text-gray-900 dark:text-white mb-2">AI Output</div>
+          <div className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+            AI Output
+          </div>
           <pre className="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-200">
             {(res as any).analysis_text}
           </pre>

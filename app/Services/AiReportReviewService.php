@@ -82,11 +82,27 @@ SYS;
 
         $text = $this->stripCodeFences($text);
 
-        $parsed = json_decode($text, true);
-        if (!is_array($parsed)) {
+        // HARD JSON extraction (ignore everything except first JSON object)
             $jsonOnly = $this->extractJsonObject($text);
-            $parsed = $jsonOnly ? json_decode($jsonOnly, true) : null;
-        }
+
+            if (!$jsonOnly) {
+                return [
+                    'ok' => false,
+                    'error' => 'Gemini output was not valid JSON',
+                    'raw' => $text,
+                ];
+            }
+
+            $parsed = json_decode($jsonOnly, true);
+
+            if (!is_array($parsed)) {
+                return [
+                    'ok' => false,
+                    'error' => 'Gemini JSON decode failed',
+                    'raw' => $jsonOnly,
+                ];
+            }
+
 
         if (!is_array($parsed)) {
             return ['ok' => false, 'error' => 'Gemini output was not valid JSON', 'raw' => $text];
