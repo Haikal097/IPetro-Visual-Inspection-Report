@@ -9,7 +9,7 @@ class GeminiService
 {
     public function generateText(string $prompt): string
     {
-        $apiKey  = config('gemini.api_key') ?: env('AIzaSyBYxuqYvqn_FTzGK4wHF_6cQKlcRqRMJVY');
+        $apiKey  = config('gemini.api_key') ?:
         $model   = config('gemini.model') ?: env('GEMINI_MODEL', 'gemini-2.5-flash');
         $baseUrl = config('gemini.base_url') ?: env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com');
         $timeout = (int) (config('gemini.request_timeout') ?: env('GEMINI_TIMEOUT', 60));

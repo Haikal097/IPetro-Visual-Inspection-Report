@@ -5,6 +5,9 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import PhotoReportPrint from '@/components/printable/PhotoReportPrint';
 import PVReportPrint from '@/components/printable/PVReportPrint';
+import ReportReviewAssistantPanel from "@/components/ai/ReportReviewAssistantPanel";
+import ReportReviewModal from "@/components/ai/ReportReviewModal";
+
 import {
   FileText,
   CheckCircle,
@@ -134,6 +137,13 @@ export default function ShowReview({ report }: { report: any }) {
     if (!message || !message.trim()) return;
     router.post(`/review/${reportId}/request-revision`, { message });
   };
+
+  //ai review
+  const [showAiReview, setShowAiReview] = useState(false);
+
+  //ai review modal
+  const [openAiReview, setOpenAiReview] = useState(false);
+
 
   // Close print preview if open
   useEffect(() => {
@@ -637,6 +647,24 @@ export default function ShowReview({ report }: { report: any }) {
               </div>
             </div>
 
+            {/*<div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">AI Tools</h3>
+
+              <button
+                onClick={() => setShowAiReview((v) => !v)}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                {showAiReview ? "Hide AI Review" : "AI Review"}
+              </button>
+
+              {showAiReview && (
+                <div className="mt-4">
+                  <ReportReviewAssistantPanel report={report} />
+                </div>
+              )}
+            </div>*/}
+
+
             {/* Status Panel */}
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Report Status</h3>
@@ -689,6 +717,24 @@ export default function ShowReview({ report }: { report: any }) {
               </div>
             </div>
 
+            {/* AI Review Modal */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">AI Tools</h3>
+
+              <button
+                type="button"
+                onClick={() => setOpenAiReview(true)}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                AI Review Assistant
+              </button>
+
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Generates completeness checks + suggested reviewer comment template.
+              </p>
+            </div>
+
+
               {/* Actions Panel */}
               {canUserReview && canReview && report.status !== 'revisions_requested' && (
                 <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
@@ -726,6 +772,13 @@ export default function ShowReview({ report }: { report: any }) {
           </div>
         </div>
       </div>
+
+    <ReportReviewModal
+      open={openAiReview}
+      onClose={() => setOpenAiReview(false)}
+      report={report}
+    />
     </AppLayout>
+
   );
 }

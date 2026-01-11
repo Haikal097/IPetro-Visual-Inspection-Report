@@ -21,6 +21,8 @@ use App\Http\Controllers\Api\EquipmentTemplateController;
 use App\Http\Controllers\Api\InspectorAiController;
 use App\Http\Controllers\AiInspectorChatController;
 use App\Http\Controllers\Api\AiDashboardAnalysisController;
+use App\Http\Controllers\Api\AiReportReviewAssistantController;
+use App\Http\Controllers\Api\AiReportReviewController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -289,6 +291,15 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
     // dashboard analysis (use invoke controller)
     Route::post('/ai/dashboard-analysis', AiDashboardAnalysisController::class)
         ->name('ai.dashboard-analysis');
+
+    // report review assistant
+    Route::post('/ai/report-review-assistant', AiReportReviewAssistantController::class)
+    ->name('ai.report-review-assistant');
+
+    //report ai assistant for reviewer
+    Route::post('/ai/report-review', AiReportReviewController::class)
+    ->name('ai.report-review');
+
 
     /*
     |----------------------------------------------------------------------
