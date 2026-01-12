@@ -57,7 +57,8 @@ export default function ReportReviewModal({ open, onClose, report }: Props) {
                     AI Review Assistant
                   </Dialog.Title>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Completeness & consistency analysis (not photos)
+                    Completeness & consistency analysis of this report
+                    (Reminder : AI can make mistakes, please review carefully)
                   </p>
                 </div>
 

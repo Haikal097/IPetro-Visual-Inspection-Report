@@ -23,6 +23,7 @@ use App\Http\Controllers\AiInspectorChatController;
 use App\Http\Controllers\Api\AiDashboardAnalysisController;
 use App\Http\Controllers\Api\AiReportReviewAssistantController;
 use App\Http\Controllers\Api\AiReportReviewController;
+use App\Http\Controllers\Api\AiInspectorChatHistoryController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -299,6 +300,16 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
     //report ai assistant for reviewer
     Route::post('/ai/report-review', AiReportReviewController::class)
     ->name('ai.report-review');
+
+    //ai inspector chat history
+    Route::get('/ai/inspector-chat/sessions', [AiInspectorChatHistoryController::class, 'sessions'])
+    ->name('ai.inspector-chat.sessions');
+
+Route::get('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryController::class, 'messages'])
+    ->name('ai.inspector-chat.messages');
+
+Route::delete('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryController::class, 'delete'])
+    ->name('ai.inspector-chat.delete');
 
 
     /*
