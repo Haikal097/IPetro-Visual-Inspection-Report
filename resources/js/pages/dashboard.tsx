@@ -622,28 +622,6 @@ export default function Dashboard() {
                             <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Recent Reports</h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Latest inspection reports in the system</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="text"
-                                placeholder="Search reports..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                            />
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                            >
-                                <option value="all">All Status</option>
-                                <option value="draft">Draft</option>
-                                <option value="submitted">Submitted</option>
-                                <option value="in_review">In Review</option>
-                                <option value="approved">Approved</option>
-                                <option value="rejected">Rejected</option>
-                                <option value="closed">Closed</option>
-                            </select>
-                        </div>
                     </div>
 
                     {filteredReports.length > 0 ? (
