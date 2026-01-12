@@ -149,6 +149,7 @@ class ReportController extends Controller
         }
 
         $updateData = [
+            'title' => $request->title,
             'status' => $request->status,
             'json_data' => $request->json_data,
         ];

@@ -154,6 +154,8 @@ const ready = Object.values(checklist).every(Boolean);
 
     const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState<number | "">("");
+    const readOnly = reportStatus && ['approved', 'rejected', 'submitted'].includes(reportStatus);
+    
 
 
     // In your React component (PVReport.tsx)
@@ -200,6 +202,16 @@ const ready = Object.values(checklist).every(Boolean);
         }
     };
 
+    const getInputProps = (field: keyof FormState) => ({
+        disabled: readOnly,
+        className: `w-full rounded-lg border px-4 py-3 text-sm transition-all ${
+            readOnly 
+            ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+            : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+        }`,
+        title: readOnly ? `Cannot edit - Report is ${reportStatus}` : '',
+    });
+
     // Preset text templates
     const PRESET_TEXT: Record<string, PresetItem> = {
         "Nitrogen Vessel": {
@@ -228,15 +240,6 @@ const ready = Object.values(checklist).every(Boolean);
 
     // Get initial form state
     function getInitialFormState(): FormState {
-        const stored = localStorage.getItem("ipetro_pv_report");
-        if (stored) {
-            try {
-                return JSON.parse(stored);
-            } catch (e) {
-                console.error("Failed to parse stored form data");
-            }
-        }
-
         const today = new Date().toISOString().split("T")[0];
         return {
             equipmentTag: "",
@@ -246,7 +249,7 @@ const ready = Object.values(checklist).every(Boolean);
             doshRegistration: "",
             reportNo: "",
             reportDate: today,
-            initialFinding: "", // Changed from "Not applicable" to empty string
+            initialFinding: "",
             externalFinding: "",
             internalFinding: "",
             ndt: "",
@@ -265,15 +268,6 @@ const ready = Object.values(checklist).every(Boolean);
             counts[field] = text.trim().split(/\s+/).filter(word => word.length > 0).length;
         });
         setWordCount(counts);
-    }, [form]);
-
-    // Auto-save to localStorage
-    useEffect(() => {
-        const saveTimeout = setTimeout(() => {
-            localStorage.setItem("ipetro_pv_report", JSON.stringify(form));
-        }, 500);
-
-        return () => clearTimeout(saveTimeout);
     }, [form]);
 
     useEffect(() => {
@@ -383,18 +377,6 @@ const ready = Object.values(checklist).every(Boolean);
                     inspectorName: jsonData.inspectorName || page.auth?.user?.name || '',
                     publishDate: jsonData.publishDate || jsonData.reportDate || new Date().toISOString().split("T")[0],
                 });
-                
-                // Also load from localStorage to merge any local changes
-                const stored = localStorage.getItem("ipetro_pv_report");
-                if (stored) {
-                    try {
-                        const storedData = JSON.parse(stored);
-                        // Merge stored data (prefer user's recent edits)
-                        setForm(prev => ({ ...prev, ...storedData }));
-                    } catch (e) {
-                        console.error("Failed to merge stored data");
-                    }
-                }
 
                 const dbStatus =
                     responseData.data?.status ||
@@ -708,8 +690,6 @@ const ready = Object.values(checklist).every(Boolean);
                 response.status === 201;
 
             if (isSuccess) {
-                // Save to localStorage
-                localStorage.setItem("ipetro_pv_report", JSON.stringify(form));
                 
                 const successMessage = status === 'draft' ? 'saved' : 'submitted';
                 toast.success(`Report ${successMessage} successfully!`, {
@@ -718,8 +698,6 @@ const ready = Object.values(checklist).every(Boolean);
                 });
                 
                 if (status === 'submitted') {
-                    // Clear local storage after submission
-                    localStorage.removeItem("ipetro_pv_report");
                     setForm(getInitialFormState());
                     setReportId(null);
                 }
@@ -760,25 +738,31 @@ const ready = Object.values(checklist).every(Boolean);
     const handleOpenPhotoReport = async () => {
         console.log('=== handleOpenPhotoReport ===');
         
-        // If we already have a reportId, use it
+        // Always allow opening photo report if we have reportId
         if (reportId) {
-            console.log('Using existing reportId:', reportId);
+            console.log('Navigating to photo report with ID:', reportId);
             router.visit(`/reports/photo-report?report_id=${reportId}`);
             return;
         }
         
-        // Otherwise save and get new ID
-        const result = await handleSave('draft');
-        console.log('Save result:', result);
-        
-        if (result.success && result.reportId) {
-            console.log('✅ Navigate to photo report with ID:', result.reportId);
-            setTimeout(() => {
-                router.visit(`/reports/photo-report?report_id=${result.reportId}`);
-            }, 500);
+        // Only save for new reports (no reportId)
+        if (!readOnly) {
+            // For editable reports without ID, save first
+            const result = await handleSave('draft');
+            console.log('Save result:', result);
+            
+            if (result.success && result.reportId) {
+                console.log('✅ Navigate to photo report with ID:', result.reportId);
+                setTimeout(() => {
+                    router.visit(`/reports/photo-report?report_id=${result.reportId}`);
+                }, 500);
+            } else {
+                console.error('Failed to save or get ID:', result);
+                toast.error('Please save the report first using "Save Draft"');
+            }
         } else {
-            console.error('Failed to save or get ID:', result);
-            toast.error('Please save the report first using "Save Draft"');
+            // This shouldn't happen (read-only report without ID), but handle it
+            toast.error('Report not found or not saved yet');
         }
     };
 
@@ -808,50 +792,48 @@ const ready = Object.values(checklist).every(Boolean);
   toast.success(`Template applied: ${t.title || t.equipment_type}`, { icon: "✨" });
     };
 
-
-// Helper function to generate title
-const generateAutoTitle = (formData: FormState): string => {
-    const parts: string[] = [];
-    
-    // Add equipment type
-    if (formData.equipmentType && formData.equipmentType !== "Select equipment type..." && formData.equipmentType !== "") {
-        parts.push(formData.equipmentType);
-    }
-    
-    // Add equipment tag
-    if (formData.equipmentTag) {
-        parts.push(formData.equipmentTag);
-    }
-    
-    // Add report number
-    if (formData.reportNo) {
-        parts.push(`(${formData.reportNo})`);
-    }
-    
-    // Add date
-    if (formData.reportDate) {
-        try {
-            const date = new Date(formData.reportDate);
-            if (!isNaN(date.getTime())) {
-                const formattedDate = date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    year: 'numeric'
-                });
-                parts.push(`${formattedDate} Inspection`);
-            }
-        } catch (e) {
-            // Date parsing failed, skip date part
+    // Generate automatic title
+    const generateAutoTitle = (formData: FormState): string => {
+        const parts: string[] = [];
+        
+        // Only include equipment type if it's specific
+        if (formData.equipmentType && 
+            formData.equipmentType !== "Select equipment type..." && 
+            formData.equipmentType !== "" &&
+            formData.equipmentType !== "Custom / Manual") {
+            parts.push(formData.equipmentType);
         }
-    }
-    
-    // Join parts or return default
-    if (parts.length > 0) {
-        return parts.join(' - ');
-    }
-    
-    // Default with timestamp if nothing available
-    return `Inspection Report - ${new Date().toLocaleDateString()}`;
-};
+        
+        // Add equipment tag (simplified)
+        if (formData.equipmentTag) {
+            parts.push(formData.equipmentTag);
+        }
+        
+        // Add date
+        if (formData.reportDate) {
+            try {
+                const date = new Date(formData.reportDate);
+                if (!isNaN(date.getTime())) {
+                    const formattedDate = date.toLocaleDateString('en-US', {
+                        month: 'short',
+                        year: 'numeric'
+                    });
+                    parts.push(`${formattedDate} Inspection`);
+                }
+            } catch (e) {
+                // Date parsing failed, skip date part
+            }
+        }
+        
+        // Join parts or return default
+        if (parts.length > 0) {
+            // If you want "Inspection Report" at the end instead of in the middle
+            return parts.join(' - ');
+        }
+        
+        // Default with timestamp if nothing available
+        return `Pressure Vessel Inspection Report`;
+    };
     // Handle print
     const handlePrint = () => {
         // Create a new window for printing
@@ -1181,7 +1163,6 @@ const generateAutoTitle = (formData: FormState): string => {
     // Handle reset
     const handleReset = () => {
         if (confirm("Are you sure you want to clear the entire report? This cannot be undone.")) {
-            localStorage.removeItem("ipetro_pv_report");
             setForm(getInitialFormState());
             toast.success('Report cleared', {
                 icon: '🗑️',
@@ -1266,6 +1247,41 @@ const generateAutoTitle = (formData: FormState): string => {
 
                 {/* Main Content */}
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    
+                {readOnly && reportStatus && (
+                <div className="mb-6">
+                    <div className={`p-4 rounded-lg border-l-4 ${
+                    reportStatus === 'approved' 
+                        ? 'bg-green-50 border-green-500 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+                        : reportStatus === 'rejected'
+                        ? 'bg-red-50 border-red-500 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+                        : 'bg-blue-50 border-blue-500 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
+                    }`}>
+                    <div className="flex items-center gap-3">
+                        {reportStatus === 'approved' ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                        ) : reportStatus === 'rejected' ? (
+                        <XCircle className="h-5 w-5" />
+                        ) : (
+                        <Info className="h-5 w-5" />
+                        )}
+                        <div>
+                        <p className="font-semibold">
+                            Report is {reportStatus.toUpperCase()}
+                            {reportStatus === 'submitted' && ' for review'}
+                        </p>
+                        <p className="text-sm mt-1">
+                            {reportStatus === 'approved' 
+                            ? 'This report has been approved and cannot be edited.'
+                            : reportStatus === 'rejected'
+                            ? 'This report has been rejected. Contact administrator for revisions.'
+                            : 'This report is currently under review and cannot be edited.'}
+                        </p>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                )}
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                         {/* Left Sidebar - Navigation */}
                         <div className="lg:col-span-1">
@@ -1361,12 +1377,18 @@ const generateAutoTitle = (formData: FormState): string => {
 
                                 {/* Danger Zone */}
                                 <div className="mt-6 pt-6 border-t border-red-200 dark:border-red-800">
+                                    {/* Clear All Data button */}
                                     <button
-                                        onClick={handleReset}
-                                        className="w-full flex items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30 transition-all"
+                                    onClick={handleReset}
+                                    disabled={readOnly}
+                                    className={`w-full flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
+                                        readOnly 
+                                        ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800'
+                                        : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30'
+                                    }`}
                                     >
-                                        <Trash2 className="h-4 w-4" />
-                                        Clear All Data
+                                    <Trash2 className="h-4 w-4" />
+                                    Clear All Data
                                     </button>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                                         This will permanently delete all entered data
@@ -1377,6 +1399,7 @@ const generateAutoTitle = (formData: FormState): string => {
 
                         {/* Main Form Area */}
                         <div className="lg:col-span-3 space-y-6">
+                            {/* Equipment Details Section */}
                             {/* Equipment Details Section */}
                             {activeSection === "details" && (
                                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -1400,61 +1423,95 @@ const generateAutoTitle = (formData: FormState): string => {
                                     <div className="space-y-6">
                                         {/* Equipment Template Selection */}
                                         <div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                                                    Report Title (Optional)
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                                                        - Auto-generated if empty
+                                                    </span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={form.title || generateAutoTitle(form)}
+                                                    onChange={handleChange("title")}
+                                                    disabled={readOnly}
+                                                    className={`w-full rounded-lg border px-4 py-3 text-sm transition-all ${
+                                                        readOnly 
+                                                            ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                                                            : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+                                                    }`}
+                                                    placeholder={generateAutoTitle(form)}
+                                                />
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                    Leave empty to auto-generate: "{generateAutoTitle(form)}"
+                                                </p>
+                                            </div>
                                             <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                                            Equipment Template (auto-fill)
+                                                Equipment Template (auto-fill)
                                             </label>
 
                                             <div className="flex flex-col md:flex-row gap-2">
-                                            <select
-                                                value={selectedTemplateId ?? ""}
-                                                onChange={(e) => {
-                                                const val = e.target.value ? Number(e.target.value) : null;
-                                                setSelectedTemplateId(val);
+                                                <select
+                                                    value={selectedTemplateId ?? ""}
+                                                    onChange={(e) => {
+                                                        if (readOnly) return; // Add this check
+                                                        const val = e.target.value ? Number(e.target.value) : null;
+                                                        setSelectedTemplateId(val);
 
-                                                if (!val) return;
-                                                const t = templates.find((x) => x.id === val);
-                                                if (!t) return;
+                                                        if (!val) return;
+                                                        const t = templates.find((x) => x.id === val);
+                                                        if (!t) return;
 
-                                                const hasAnyText =
-                                                    !!form.initialFinding.trim() ||
-                                                    !!form.externalFinding.trim() ||
-                                                    !!form.internalFinding.trim() ||
-                                                    !!form.ndt.trim() ||
-                                                    !!form.recommendations.trim();
+                                                        const hasAnyText =
+                                                            !!form.initialFinding.trim() ||
+                                                            !!form.externalFinding.trim() ||
+                                                            !!form.internalFinding.trim() ||
+                                                            !!form.ndt.trim() ||
+                                                            !!form.recommendations.trim();
 
-                                                if (hasAnyText) {
-                                                    const ok = confirm(
-                                                    "Apply template now?\n\nOK = Replace existing section texts\nCancel = Only fill empty fields"
-                                                    );
-                                                    applyTemplateToForm(t, ok);
-                                                } else {
-                                                    applyTemplateToForm(t, true);
-                                                }
-                                                }}
-                                                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
-                                            >
-                                                <option value="">Select template...</option>
-                                                {templates.map((t) => (
-                                                <option key={t.id} value={t.id}>
-                                                    {t.equipment_type} - {t.title || "Untitled"}
-                                                </option>
-                                                ))}
-                                            </select>
+                                                        if (hasAnyText) {
+                                                            const ok = confirm(
+                                                                "Apply template now?\n\nOK = Replace existing section texts\nCancel = Only fill empty fields"
+                                                            );
+                                                            applyTemplateToForm(t, ok);
+                                                        } else {
+                                                            applyTemplateToForm(t, true);
+                                                        }
+                                                    }}
+                                                    disabled={readOnly}
+                                                    className={`w-full rounded-lg border px-4 py-3 text-sm transition-all ${
+                                                        readOnly 
+                                                            ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                                                            : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+                                                    }`}
+                                                >
+                                                    <option value="">Select template...</option>
+                                                    {templates.map((t) => (
+                                                        <option key={t.id} value={t.id}>
+                                                            {t.equipment_type} - {t.title || "Untitled"}
+                                                        </option>
+                                                    ))}
+                                                </select>
 
-                                            <button
-                                                type="button"
-                                                onClick={() => router.visit("/equipment-templates")}
-                                                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
-                                            >
-                                                Manage Templates
-                                            </button>
+                                                {/* Manage Templates button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => router.visit("/equipment-templates")}
+                                                    disabled={readOnly}
+                                                    className={`rounded-lg border px-4 py-3 text-sm font-semibold transition-all ${
+                                                        readOnly
+                                                            ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800'
+                                                            : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                                                    }`}
+                                                >
+                                                    Manage Templates
+                                                </button>
                                             </div>
 
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                            Selecting a template can auto-fill Initial / External / Internal / NDT / Recommendations.
+                                                Selecting a template can auto-fill Initial / External / Internal / NDT / Recommendations.
                                             </p>
                                         </div>
-
 
                                         {/* Equipment Details Grid */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1466,7 +1523,12 @@ const generateAutoTitle = (formData: FormState): string => {
                                                     type="text"
                                                     value={form.equipmentTag}
                                                     onChange={handleChange("equipmentTag")}
-                                                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
+                                                    disabled={readOnly}
+                                                    className={`w-full rounded-lg border px-4 py-3 text-sm transition-all ${
+                                                        readOnly 
+                                                            ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                                                            : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+                                                    }`}
                                                     placeholder="e.g., V-101, TK-205"
                                                 />
                                             </div>
@@ -1478,7 +1540,12 @@ const generateAutoTitle = (formData: FormState): string => {
                                                     type="text"
                                                     value={form.plantUnitArea}
                                                     onChange={handleChange("plantUnitArea")}
-                                                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
+                                                    disabled={readOnly}
+                                                    className={`w-full rounded-lg border px-4 py-3 text-sm transition-all ${
+                                                        readOnly 
+                                                            ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                                                            : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+                                                    }`}
                                                     placeholder="e.g., Process Unit 1, Storage Area"
                                                 />
                                             </div>
@@ -1493,7 +1560,12 @@ const generateAutoTitle = (formData: FormState): string => {
                                                     type="text"
                                                     value={form.doshRegistration}
                                                     onChange={handleChange("doshRegistration")}
-                                                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
+                                                    disabled={readOnly}
+                                                    className={`w-full rounded-lg border px-4 py-3 text-sm transition-all ${
+                                                        readOnly 
+                                                            ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                                                            : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+                                                    }`}
                                                     placeholder="Enter DOSH registration"
                                                 />
                                             </div>
@@ -1505,7 +1577,12 @@ const generateAutoTitle = (formData: FormState): string => {
                                                     type="text"
                                                     value={form.reportNo}
                                                     onChange={handleChange("reportNo")}
-                                                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
+                                                    disabled={readOnly}
+                                                    className={`w-full rounded-lg border px-4 py-3 text-sm transition-all ${
+                                                        readOnly 
+                                                            ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                                                            : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+                                                    }`}
                                                     placeholder="e.g., PLANT1/V-001/TA2025"
                                                 />
                                             </div>
@@ -1519,7 +1596,12 @@ const generateAutoTitle = (formData: FormState): string => {
                                                 type="date"
                                                 value={form.reportDate}
                                                 onChange={handleChange("reportDate")}
-                                                className="w-full max-w-xs rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all"
+                                                disabled={readOnly}
+                                                className={`w-full max-w-xs rounded-lg border px-4 py-3 text-sm transition-all ${
+                                                    readOnly 
+                                                        ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                                                        : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+                                                }`}
                                             />
                                         </div>
                                     </div>
@@ -1538,6 +1620,7 @@ const generateAutoTitle = (formData: FormState): string => {
                                     wordCount={wordCount.initialFinding}
                                     onCopy={() => copyToClipboard("initialFinding", "Initial Findings")}
                                     copied={copiedField === "initialFinding"}
+                                    readOnly={readOnly}
                                 />
                             )}
 
@@ -1553,6 +1636,7 @@ const generateAutoTitle = (formData: FormState): string => {
                                     wordCount={wordCount.externalFinding}
                                     onCopy={() => copyToClipboard("externalFinding", "External Findings")}
                                     copied={copiedField === "externalFinding"}
+                                    readOnly={readOnly}
                                 />
                             )}
 
@@ -1568,6 +1652,7 @@ const generateAutoTitle = (formData: FormState): string => {
                                     wordCount={wordCount.internalFinding}
                                     onCopy={() => copyToClipboard("internalFinding", "Internal Findings")}
                                     copied={copiedField === "internalFinding"}
+                                    readOnly={readOnly}
                                 />
                             )}
 
@@ -1583,6 +1668,7 @@ const generateAutoTitle = (formData: FormState): string => {
                                     wordCount={wordCount.ndt}
                                     onCopy={() => copyToClipboard("ndt", "NDT Results")}
                                     copied={copiedField === "ndt"}
+                                    readOnly={readOnly}
                                 />
                             )}
 
@@ -1598,6 +1684,7 @@ const generateAutoTitle = (formData: FormState): string => {
                                     wordCount={wordCount.recommendations}
                                     onCopy={() => copyToClipboard("recommendations", "Recommendations")}
                                     copied={copiedField === "recommendations"}
+                                    readOnly={readOnly}
                                 />
                             )}
 
@@ -1660,25 +1747,17 @@ const generateAutoTitle = (formData: FormState): string => {
                                         signatureUrl={signatureUrl}
                                         onGenerateAI={handleGenerateAI}
                                         aiLoading={aiLoading}
+                                        readOnly={readOnly}
                                         />
 
                                 </div>
                                 )}
 
 
-                            {/* Navigation Footer */}
-                            <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
-                                <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                                    <div className={`h-2 w-2 rounded-full ${new Date().getSeconds() % 2 === 0 ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                    Auto-saved {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    {/* Progress indicator */}
-                                    <div className="hidden sm:block text-xs text-gray-500 dark:text-gray-400">
-                                        {sections.findIndex(s => s.id === activeSection) + 1} of {sections.length}
-                                    </div>
-                                    
-                                    <div className="flex gap-2">
+                                {/* Navigation Footer */}
+                                <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
+                                    {/* LEFT SIDE: Previous button only */}
+                                    <div className="flex items-center">
                                         {/* Previous button - only show if not on first section */}
                                         {sections.findIndex(s => s.id === activeSection) > 0 && (
                                             <button
@@ -1686,110 +1765,115 @@ const generateAutoTitle = (formData: FormState): string => {
                                                     const currentIndex = sections.findIndex(s => s.id === activeSection);
                                                     setActiveSection(sections[currentIndex - 1].id);
                                                 }}
-                                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center gap-2 border border-gray-300 rounded-lg hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
+                                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
                                             >
                                                 <ChevronRight className="h-4 w-4 rotate-180" />
                                                 Previous
                                             </button>
                                         )}
+                                    </div>
+
+                                    {/* RIGHT SIDE: Page indicator and action buttons */}
+                                    <div className="flex items-center gap-3">
+                                        {/* Progress indicator */}
+                                        <div className="hidden sm:block text-xs text-gray-500 dark:text-gray-400">
+                                            {sections.findIndex(s => s.id === activeSection) + 1} of {sections.length}
+                                        </div>
                                         
-                                        {/* Next/Complete button */}
-                                        {sections.findIndex(s => s.id === activeSection) === sections.length - 1 ? (
-                                            // Last section (Preview) - Show completion options
-                                            <div className="flex gap-2">
-                                                <button
+                                        <div className="flex gap-2">
+                                            {/* Next/Complete button */}
+                                            {sections.findIndex(s => s.id === activeSection) === sections.length - 1 ? (
+                                                // Last section (Preview) - Show completion options
+                                                <>
+                                                    {/* Save Draft button */}
+                                                    <button
                                                     onClick={async () => {
-                                                        const result = await handleSave('draft', true); // ← Add true for redirect
+                                                        const result = await handleSave('draft', true);
                                                         console.log('Save result:', result);
                                                         
                                                         if (result.success && result.reportId) {
-                                                            console.log('Redirecting to /pv-report/' + result.reportId);
-                                                            // Redirect to the new report URL
-                                                            setTimeout(() => {
-                                                                router.visit(`/pv-report/${result.reportId}`);
-                                                            }, 1000);
+                                                        console.log('Redirecting to /pv-report/' + result.reportId);
+                                                        setTimeout(() => {
+                                                            router.visit(`/pv-report/${result.reportId}`);
+                                                        }, 1000);
                                                         } else if (result.success) {
-                                                            toast.success('Report saved!', { icon: '💾' });
+                                                        toast.success('Report saved!', { icon: '💾' });
                                                         }
                                                     }}
-                                                    disabled={isSaving}
+                                                    disabled={isSaving || readOnly}
                                                     className={`px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors flex items-center gap-2 ${
-                                                        isSaving ? 'opacity-50 cursor-not-allowed' : ''
+                                                        isSaving || readOnly ? 'opacity-50 cursor-not-allowed' : ''
                                                     }`}
-                                                >
+                                                    >
                                                     {isSaving ? (
                                                         <>
-                                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                            </svg>
-                                                            Saving...
+                                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Saving...
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Save className="h-4 w-4" />
-                                                            {reportId ? 'Update Draft' : 'Save Draft'}
+                                                        <Save className="h-4 w-4" />
+                                                        {reportId ? 'Update Draft' : 'Save Draft'}
                                                         </>
                                                     )}
-                                                </button>
-                                                
+                                                    </button>
+                                                    
+                                                    {/* Open Photo Report button */}
+                                                    <button
+                                                        onClick={handleOpenPhotoReport}
+                                                        disabled={isSaving} // Remove readOnly from disabled condition
+                                                        className={`px-4 py-2 text-sm font-medium bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-colors flex items-center gap-2 ${
+                                                            isSaving ? 'opacity-50 cursor-not-allowed' : ''
+                                                        }`}
+                                                    >
+                                                        {isSaving ? (
+                                                            <>
+                                                                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                </svg>
+                                                                Saving...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Check className="h-4 w-4" />
+                                                                Open Photo Report
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                // Not last section - Show next section button
                                                 <button
-                                                    onClick={handleOpenPhotoReport}
-                                                    disabled={isSaving}
-                                                    className={`px-4 py-2 text-sm font-medium bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-colors flex items-center gap-2 ${
-                                                        isSaving ? 'opacity-50 cursor-not-allowed' : ''
-                                                    }`}
-                                                >
-                                                    {isSaving ? (
-                                                        <>
-                                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                            </svg>
-                                                            Saving...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Check className="h-4 w-4" />
-                                                            Open Photo Report
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            // Not last section - Show next section button
-                                            <button
-                                                onClick={() => {
-                                                    const currentIndex = sections.findIndex(s => s.id === activeSection);
-                                                    const nextSection = sections[currentIndex + 1];
-                                                    
-                                                    // Optional: Validate current section before proceeding
-                                                    if (activeSection === 'details') {
-                                                        if (!form.equipmentTag || !form.equipmentType || !form.reportNo) {
-                                                            toast.error('Please complete all required fields in Equipment Details', {
-                                                                icon: '⚠️',
-                                                                duration: 3000,
-                                                            });
-                                                            return;
+                                                    onClick={() => {
+                                                        const currentIndex = sections.findIndex(s => s.id === activeSection);
+                                                        const nextSection = sections[currentIndex + 1];
+                                                        
+                                                        // Optional: Validate current section before proceeding
+                                                        if (activeSection === 'details') {
+                                                            if (!form.equipmentTag || !form.equipmentType || !form.reportNo) {
+                                                                toast.error('Please complete all required fields in Equipment Details', {
+                                                                    icon: '⚠️',
+                                                                    duration: 3000,
+                                                                });
+                                                                return;
+                                                            }
                                                         }
-                                                    }
-                                                    
-                                                    setActiveSection(nextSection.id);
-                                                    
-                                                    // Optional: Auto-save
-                                                    setTimeout(() => {
-                                                        localStorage.setItem("ipetro_pv_report", JSON.stringify(form));
-                                                    }, 300);
-                                                }}
-                                                className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-colors flex items-center gap-2"
-                                            >
-                                                Continue to {sections[sections.findIndex(s => s.id === activeSection) + 1]?.label}
-                                                <ChevronRight className="h-4 w-4" />
-                                            </button>
-                                        )}
+                                                        
+                                                        setActiveSection(nextSection.id);
+                                                    }}
+                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-colors flex items-center gap-2"
+                                                >
+                                                    Continue to {sections[sections.findIndex(s => s.id === activeSection) + 1]?.label}
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1826,6 +1910,7 @@ interface TextAreaSectionProps {
   wordCount: number;
   onCopy: () => void;
   copied: boolean;
+  readOnly?: boolean;
 }
 
 function TextAreaSection({
@@ -1838,13 +1923,18 @@ function TextAreaSection({
   wordCount,
   onCopy,
   copied,
+  readOnly = false,
 }: TextAreaSectionProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+              readOnly 
+                ? 'bg-gradient-to-br from-gray-400 to-gray-500' 
+                : 'bg-gradient-to-br from-blue-500 to-blue-600'
+            }`}>
               <Icon className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -1854,13 +1944,27 @@ function TextAreaSection({
           </div>
         </div>
 
-        <button
-          onClick={onCopy}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
-        >
-          {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-          {copied ? "Copied!" : "Copy"}
-        </button>
+        <div className="flex items-center gap-2">
+          {readOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              <Eye className="h-3 w-3" />
+              View Only
+            </span>
+          )}
+          
+          <button
+            onClick={onCopy}
+            disabled={readOnly}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
+              readOnly
+                ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800'
+                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+          >
+            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -1868,29 +1972,40 @@ function TextAreaSection({
           <textarea
             value={value}
             onChange={onChange}
-            className="w-full min-h-[200px] rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white transition-all resize-y"
-            placeholder={placeholder}
+            disabled={readOnly}
+            className={`w-full min-h-[200px] rounded-lg border px-4 py-3 text-sm resize-y transition-all ${
+              readOnly 
+                ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400' 
+                : 'border-gray-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+            }`}
+            placeholder={readOnly ? "No data" : placeholder}
             rows={10}
           />
           <div className="absolute bottom-3 right-3 flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">{wordCount} words</span>
+            <span className={`text-xs ${
+              readOnly ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'
+            }`}>
+              {wordCount} words
+            </span>
           </div>
         </div>
 
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
-          <div className="flex items-start gap-3">
-            <HelpCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white">Formatting Tips</h4>
-              <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                <li>• Use bullet points or numbered lists for clarity</li>
-                <li>• Include specific locations and measurements</li>
-                <li>• Note any deviations from previous inspections</li>
-                <li>• Reference applicable standards (ASME, API, etc.)</li>
-              </ul>
+        {!readOnly && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
+            <div className="flex items-start gap-3">
+              <HelpCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Formatting Tips</h4>
+                <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                  <li>• Use bullet points or numbered lists for clarity</li>
+                  <li>• Include specific locations and measurements</li>
+                  <li>• Note any deviations from previous inspections</li>
+                  <li>• Reference applicable standards (ASME, API, etc.)</li>
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -1905,9 +2020,17 @@ interface PreviewSectionProps {
   signatureUrl: string | null; // ✅ add
   onGenerateAI: () => void;//ai
 aiLoading: boolean;//ai
+readOnly?: boolean;
 }
 
-function PreviewSection({ form, handlePrint, signatureUrl, onGenerateAI, aiLoading }: PreviewSectionProps) {
+function PreviewSection({ 
+  form, 
+  handlePrint, 
+  signatureUrl, 
+  onGenerateAI, 
+  aiLoading,
+  readOnly = false
+}: PreviewSectionProps) {
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
@@ -1921,30 +2044,38 @@ function PreviewSection({ form, handlePrint, signatureUrl, onGenerateAI, aiLoadi
         <div className="space-y-6">
             {/* Preview Controls */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {/* Left side: Preview info */}
+                    <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 dark:text-white">Document Preview</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                             This is how your report will look when printed
                         </p>
                     </div>
-                    {/* Change this button to use handlePrint instead of window.print() */}
-                    <button
-                        onClick={handlePrint} // Use the passed function
-                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:from-red-700 hover:to-red-800 transition-all"
-                    >
-                        <Printer className="h-4 w-4" />
-                        Print / PDF
-                    </button>
-                
-                <button
+                    
+                    {/* Right side: Action buttons - Print on far right, AI to its left */}
+                    <div className="flex items-center gap-3">
+                        {/* AI Improve Draft button in PreviewSection */}
+                        <button
                         onClick={onGenerateAI}
-                        disabled={aiLoading}
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all disabled:opacity-60"
+                        disabled={aiLoading || readOnly}
+                        className={`inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-all min-w-[140px] justify-center ${
+                            aiLoading || readOnly ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                         >
                         <span className="text-base">🤖</span>
                         {aiLoading ? "Generating..." : "AI Improve Draft"}
                         </button>
+                        
+                        {/* Print Button - Primary action on far right */}
+                        <button
+                            onClick={handlePrint}
+                            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:from-red-700 hover:to-red-800 transition-all shadow-sm hover:shadow-md min-w-[120px] justify-center"
+                        >
+                            <Printer className="h-4 w-4" />
+                            Print / PDF
+                        </button>
+                    </div>
                 </div>
             </div>
 
