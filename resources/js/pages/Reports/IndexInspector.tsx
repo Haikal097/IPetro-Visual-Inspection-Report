@@ -81,6 +81,7 @@ interface Report {
 interface Stats {
   total: number;
   draft: number;
+  inReview: number;
   submitted: number;
   approved: number;
   rejected: number;
@@ -100,9 +101,9 @@ export default function Report({
   stats: Stats;
   filters?: Filters;
 }) {
-  const [activeTab, setActiveTab] = useState<'all' | 'draft' | 'submitted' | 'approved' | 'rejected'>(
-    (filters?.status as any) || 'all'
-  );
+  type TabKey = 'all' | 'draft' | 'in_review' | 'approved' | 'rejected' | 'revisions_requested';
+  const [activeTab, setActiveTab] = useState<TabKey>((filters?.status as TabKey) || 'all');
+
   const [searchQuery, setSearchQuery] = useState(filters?.search || '');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
@@ -120,6 +121,26 @@ export default function Report({
     setReasonReport(null);
   };
 
+  // ✅ IMPORTANT ADD: compute counts from reports (fixes in_review counting)
+  const counts = useMemo(() => {
+    const base = {
+      total: reports?.length ?? 0,
+      draft: 0,
+      in_review: 0,
+      revisions_requested: 0,
+      approved: 0,
+      rejected: 0,
+      submitted: 0,
+    };
+
+    for (const r of reports || []) {
+      const s = r.status;
+      if (s in base) (base as any)[s] += 1;
+    }
+
+    return base;
+  }, [reports]);
+
   // ADD THIS DEBUG CODE
   useEffect(() => {
     console.log('🔍 REPORTS DATA:', reports);
@@ -136,7 +157,9 @@ export default function Report({
         console.log(`🔍 Report ${index} keys:`, Object.keys(report));
       });
     }
-  }, [reports]);
+
+    console.log('✅ COUNTS:', counts);
+  }, [reports, counts]);
 
   const filteredReports = useMemo(() => {
     return (reports || []).filter((report) => {
@@ -432,7 +455,7 @@ export default function Report({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{counts.total}</p>
               </div>
               <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
                 <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -444,10 +467,11 @@ export default function Report({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Drafts</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.draft}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{counts.draft}</p>
               </div>
-              <div className="p-2.5 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
-                <Edit className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              {/* ✅ Draft icon now grey */}
+              <div className="p-2.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <Edit className="h-5 w-5 text-gray-700 dark:text-gray-300" />
               </div>
             </div>
           </div>
@@ -455,11 +479,11 @@ export default function Report({
           <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Submitted</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.submitted}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">On Review</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{counts.in_review}</p>
               </div>
-              <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                <Upload className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="p-2.5 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                <Upload className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
               </div>
             </div>
           </div>
@@ -468,7 +492,7 @@ export default function Report({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Approved</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.approved}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{counts.approved}</p>
               </div>
               <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg">
                 <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -481,7 +505,7 @@ export default function Report({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Rejected</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.rejected || 0}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{counts.rejected || 0}</p>
               </div>
               <div className="p-2.5 bg-red-50 dark:bg-red-900/30 rounded-lg">
                 <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -495,84 +519,84 @@ export default function Report({
           {/* Header with Filters */}
           <div className="border-b border-gray-200 dark:border-gray-800 p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            {/* Status Tabs on Left */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                  activeTab === 'all'
-                    ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                <FileText className="h-4 w-4" />
-                All Reports
-                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                  {stats.total}
-                </span>
-              </button>
+              {/* Status Tabs on Left */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'all'
+                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  All Reports
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                    {counts.total}
+                  </span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('draft')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                  activeTab === 'draft'
-                    ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Edit className="h-4 w-4" />
-                Drafts
-                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                  {stats.draft}
-                </span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('draft')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'draft'
+                      ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Edit className="h-4 w-4" />
+                  Drafts
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                    {counts.draft}
+                  </span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('submitted')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                  activeTab === 'submitted'
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/25'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Upload className="h-4 w-4" />
-                Submitted
-                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                  {stats.submitted}
-                </span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('in_review')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'in_review'
+                      ? 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white shadow-md shadow-yellow-500/25'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Upload className="h-4 w-4" />
+                  InReview
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                    {counts.in_review}
+                  </span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('approved')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                  activeTab === 'approved'
-                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-500/25'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                <CheckCircle className="h-4 w-4" />
-                Approved
-                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                  {stats.approved}
-                </span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('approved')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'approved'
+                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-500/25'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Approved
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                    {counts.approved}
+                  </span>
+                </button>
 
-              {/* ✅ ADDED: Rejected tab */}
-              <button
-                onClick={() => setActiveTab('rejected')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                  activeTab === 'rejected'
-                    ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                <XCircle className="h-4 w-4" />
-                Rejected
-                <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
-                  {stats.rejected || 0}
-                </span>
-              </button>
-            </div>
+                {/* ✅ ADDED: Rejected tab */}
+                <button
+                  onClick={() => setActiveTab('rejected')}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === 'rejected'
+                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-500/25'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <XCircle className="h-4 w-4" />
+                  Rejected
+                  <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
+                    {counts.rejected || 0}
+                  </span>
+                </button>
+              </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative w-full sm:w-80 lg:w-96">
@@ -601,7 +625,11 @@ export default function Report({
                   >
                     {/* Header */}
                     <div className="flex items-start justify-between mb-4">
-                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${getStatusBg(report.status)}`}>
+                      <div
+                        className={`h-10 w-10 rounded-lg flex items-center justify-center ${getStatusBg(
+                          report.status
+                        )}`}
+                      >
                         {getStatusIcon(report.status)}
                       </div>
                       <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -611,7 +639,9 @@ export default function Report({
 
                     {/* Report Details */}
                     <div className="mb-5">
-                      <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2">{report.title}</h4>
+                      <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2">
+                        {report.title}
+                      </h4>
 
                       <div className="flex items-center gap-2 mb-3">
                         <HardHat className="h-4 w-4 text-gray-400" />
@@ -677,11 +707,11 @@ export default function Report({
                       {(() => {
                         // Determine the route based on status
                         let viewRoute = `/pv-report/${report.id}`; // Default for draft/revisions_requested
-                        
+
                         if (['approved', 'rejected', 'submitted', 'in_review'].includes(report.status)) {
                           viewRoute = `/report/show/${report.id}`;
                         }
-                        
+
                         return (
                           <Link
                             href={viewRoute}
@@ -824,11 +854,11 @@ export default function Report({
                             {(() => {
                               // Determine the route based on status
                               let viewRoute = `/pv-report/${report.id}`; // Default for draft/revisions_requested
-                              
+
                               if (['approved', 'rejected', 'submitted', 'in_review'].includes(report.status)) {
                                 viewRoute = `/report/show/${report.id}`;
                               }
-                              
+
                               return (
                                 <Link
                                   href={viewRoute}
