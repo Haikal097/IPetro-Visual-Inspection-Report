@@ -123,8 +123,8 @@ export default function ReviewDashboard({ reviews, stats, filters }: Props) {
             const jsonData = item.json_data || {};
             
             // Use the dates from the controller
-            const submissionDate = new Date(item.submission_date || item.created_at);
-            const inspectionDate = new Date(item.inspection_date || item.created_at);
+            const submissionDate = new Date(item.updated_at);
+            const inspectionDate = new Date(item.created_at);
             
             // Calculate days pending
             const daysPending = Math.floor((Date.now() - submissionDate.getTime()) / (1000 * 60 * 60 * 24));
