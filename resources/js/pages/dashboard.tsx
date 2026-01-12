@@ -315,7 +315,7 @@ export default function Dashboard() {
                         Statistics Overview
                     </h2>
                     
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                         {/* Total Reports Card */}
                         <div className="rounded-xl bg-gradient-to-br from-red-600 to-red-700 p-5 text-white shadow-lg transition-transform duration-200 hover:scale-[1.02]">
                             <div className="flex items-center gap-4">
