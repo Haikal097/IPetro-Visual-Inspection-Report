@@ -47,7 +47,8 @@ class AiReportReviewAssistantService
                 "generationConfig" => [
                     "temperature" => 0.3,
                     "topP" => 0.9,
-                    "maxOutputTokens" => 900,
+                    "maxOutputTokens" => 4096,
+                    "responseMimeType" => "application/json",
                 ],
             ];
 
