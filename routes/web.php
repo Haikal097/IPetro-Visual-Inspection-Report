@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\AiDashboardAnalysisController;
 use App\Http\Controllers\Api\AiReportReviewAssistantController;
 use App\Http\Controllers\Api\AiReportReviewController;
 use App\Http\Controllers\Api\AiInspectorChatHistoryController;
+use App\Http\Controllers\Api\AiReportReviewHistoryController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -297,9 +298,6 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
     Route::post('/ai/report-review-assistant', AiReportReviewAssistantController::class)
     ->name('ai.report-review-assistant');
 
-    //report ai assistant for reviewer
-    Route::post('/ai/report-review', AiReportReviewController::class)
-    ->name('ai.report-review');
 
     //ai inspector chat history
     Route::get('/ai/inspector-chat/sessions', [AiInspectorChatHistoryController::class, 'sessions'])
@@ -310,6 +308,10 @@ Route::get('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryContr
 
 Route::delete('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryController::class, 'delete'])
     ->name('ai.inspector-chat.delete');
+
+    Route::get('/ai/report-review-history', [AiReportReviewHistoryController::class, 'index']);
+    Route::get('/ai/report-review-history/{id}', [AiReportReviewHistoryController::class, 'show']);
+    Route::delete('/ai/report-review-history/{id}', [AiReportReviewHistoryController::class, 'destroy']);
 
 
     /*

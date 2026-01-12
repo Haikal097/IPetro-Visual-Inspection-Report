@@ -20,7 +20,13 @@ class AiReportReviewAssistantController extends Controller
             'report.title' => 'nullable|string',
             'report.json_data' => 'nullable', // can be string or array
 
-            // optional - if you want reviewer to send extra notes
+            // ✅ NEW: photo items from frontend (text only)
+            'report.photo_items' => 'nullable|array',
+
+            // ✅ ADD ONLY: allow metadata fields coming from photo report meta
+            'report.pmt' => 'nullable|string',
+            'report.inspectionDate' => 'nullable|string',
+
             'options' => 'nullable|array',
         ]);
 
