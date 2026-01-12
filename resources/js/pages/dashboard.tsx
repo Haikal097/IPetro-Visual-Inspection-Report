@@ -20,7 +20,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 interface Report {
-    id: number;
+    report_id: number;
     title: string;
     creator_id: number;
     reviewer_id: number | null;
@@ -258,11 +258,13 @@ export default function Dashboard() {
     const formatDate = (dateString: string) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
+        
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const year = date.getFullYear();
+        
+        return `${day} ${month} ${year}`;
+        // Output: "13 Jan 2026"
     };
 
     // Get a short preview of the report title
@@ -651,7 +653,6 @@ export default function Dashboard() {
                                     <tr className="border-b border-gray-200 dark:border-gray-800">
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">Report ID</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">Title</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">Equipment</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">Status</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">Created</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">Actions</th>
@@ -663,14 +664,10 @@ export default function Dashboard() {
                                         return (
                                             <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50">
                                                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                                                    RPT-{new Date(report.creation_date).getFullYear()}-{report.id}
+                                                    RPT-{new Date(report.creation_date).getFullYear()}-{report.report_id}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                                                     {getShortTitle(report.title)}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                                                    <div>{equipment.name}</div>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400">Tag: {equipment.tag}</div>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className={getStatusBadge(report.status)}>
@@ -682,7 +679,7 @@ export default function Dashboard() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <Link 
-                                                        href={`/reports/${report.id}`}
+                                                        href={`/report/show/${report.report_id}`}
                                                         className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
                                                     >
                                                         View
