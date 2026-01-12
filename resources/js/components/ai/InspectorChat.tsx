@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -25,12 +25,19 @@ const GREETING: Msg = {
     "Hi 👋 I’m your Inspector AI. Ask me anything about PV inspection wording, findings structure, recommendations, or what to write next.",
 };
 
+function formatWhen(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso; // fallback: show raw if parsing fails
+  return d.toLocaleString();
+}
+
 export default function InspectorChat({ open, onClose, context = {} }: Props) {
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ NEW: session handling
+  // ✅ session handling
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -53,7 +60,7 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
         const { data } = await axios.get("/api/ai/inspector-chat/sessions");
         if (data?.ok) setSessions(data.sessions ?? []);
       } catch {
-        // ignore (optional: show toast)
+        // ignore
       } finally {
         setLoadingSessions(false);
       }
@@ -63,6 +70,15 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
   }, [open]);
 
   if (!open) return null;
+
+  const refreshSessions = async () => {
+    try {
+      const { data } = await axios.get("/api/ai/inspector-chat/sessions");
+      if (data?.ok) setSessions(data.sessions ?? []);
+    } catch {
+      // ignore
+    }
+  };
 
   const startNewChat = () => {
     setSessionId(null);
@@ -81,7 +97,6 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
         content: m.content,
       }));
 
-      // fallback if empty
       setMessages(loaded.length ? loaded : [GREETING]);
       setSessionId(id);
       setHistoryOpen(false);
@@ -102,9 +117,7 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
       await axios.delete(`/api/ai/inspector-chat/sessions/${id}`);
       setSessions((prev) => prev.filter((s) => s.id !== id));
 
-      if (sessionId === id) {
-        startNewChat();
-      }
+      if (sessionId === id) startNewChat();
     } catch {
       // ignore
     }
@@ -124,7 +137,7 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
         messages: next.filter((m) => m.content.trim() !== ""),
         context,
 
-        // ✅ IMPORTANT: continue same session
+        // ✅ continue same session
         session_id: sessionId ?? undefined,
       });
 
@@ -136,13 +149,8 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
 
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
 
-      // ✅ refresh session list so latest goes to top
-      try {
-        const s = await axios.get("/api/ai/inspector-chat/sessions");
-        if (s.data?.ok) setSessions(s.data.sessions ?? []);
-      } catch {
-        // ignore
-      }
+      // ✅ refresh session list so latest title/last_message updates
+      await refreshSessions();
     } catch (e: any) {
       setMessages((prev) => [
         ...prev,
@@ -153,10 +161,10 @@ export default function InspectorChat({ open, onClose, context = {} }: Props) {
     }
   };
 
-const activeLabel =
-  !sessionId
-    ? "New chat"
-    : (sessions.find((x) => x.id === sessionId)?.title || `Session #${sessionId}`);
+  const activeLabel =
+    !sessionId
+      ? "New chat"
+      : sessions.find((x) => x.id === sessionId)?.title || `Session #${sessionId}`;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-end bg-black/40 p-4">
@@ -237,7 +245,11 @@ const activeLabel =
                       {s.title || `Session #${s.id}`}
                     </div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400">
-                      {s.last_message_at ? `Last: ${s.last_message_at}` : s.created_at ? `Created: ${s.created_at}` : ""}
+                      {s.last_message_at
+                        ? `Last: ${formatWhen(s.last_message_at)}`
+                        : s.created_at
+                        ? `Created: ${formatWhen(s.created_at)}`
+                        : ""}
                     </div>
                   </button>
 
@@ -258,7 +270,10 @@ const activeLabel =
         {/* Messages */}
         <div className="max-h-[60vh] space-y-3 overflow-y-auto p-4">
           {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              key={`${m.role}-${i}-${m.content.slice(0, 20)}`}
+              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+            >
               <div
                 className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                   m.role === "user"
