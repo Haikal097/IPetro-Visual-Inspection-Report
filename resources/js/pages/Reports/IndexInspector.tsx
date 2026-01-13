@@ -92,14 +92,30 @@ interface Filters {
   search?: string;
 }
 
+interface Pagination {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  from: number;
+  to: number;
+  links: Array<{
+    url: string | null;
+    label: string;
+    active: boolean;
+  }>;
+}
+
 export default function Report({
   reports,
   stats,
   filters,
+  pagination, // ✅ ADD THIS
 }: {
   reports: Report[];
   stats: Stats;
   filters?: Filters;
+  pagination?: Pagination; // ✅ ADD THIS
 }) {
   type TabKey = 'all' | 'draft' | 'in_review' | 'approved' | 'rejected' | 'revisions_requested';
   const [activeTab, setActiveTab] = useState<TabKey>((filters?.status as TabKey) || 'all');
@@ -273,6 +289,75 @@ export default function Report({
       message: messageFromLog ?? fallbackMessage,
       created_at: createdAtFromLog ?? fallbackAt,
     };
+  };
+
+  const [currentPage, setCurrentPage] = useState(pagination?.current_page || 1);
+  const [perPage, setPerPage] = useState(pagination?.per_page || 15);
+
+  // Function to handle page change
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > (pagination?.last_page || 1)) return;
+    
+    setCurrentPage(page);
+    router.get('/reports', {
+      status: activeTab === 'all' ? undefined : activeTab,
+      search: searchQuery || undefined,
+      page,
+      per_page: perPage,
+    }, {
+      preserveScroll: true,
+      preserveState: true,
+    });
+  };
+
+  // Function to handle per page change
+  const handlePerPageChange = (value: number) => {
+    setPerPage(value);
+    setCurrentPage(1);
+    router.get('/reports', {
+      status: activeTab !== 'all' ? activeTab : undefined,
+      search: searchQuery || undefined,
+      page: 1,
+      per_page: value,
+    }, {
+      preserveScroll: true,
+      preserveState: true,
+    });
+  };
+
+  // Function to handle search with pagination
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchQuery !== (filters?.search || '')) {
+        setCurrentPage(1);
+        router.get('/reports', {
+          status: activeTab !== 'all' ? activeTab : undefined,
+          search: searchQuery || undefined,
+          page: 1,
+          per_page: perPage,
+        }, {
+          preserveScroll: true,
+          preserveState: true,
+        });
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery, activeTab, perPage]);
+
+  // Function to handle tab change with pagination
+  const handleTabChange = (tab: TabKey) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+    router.get('/reports', {
+      status: tab !== 'all' ? tab : undefined,
+      search: searchQuery || undefined,
+      page: 1,
+      per_page: perPage,
+    }, {
+      preserveScroll: true,
+      preserveState: true,
+    });
   };
 
   return (
@@ -939,6 +1024,74 @@ export default function Report({
                 )}
               </div>
             )}
+            {/* Pagination Component */}
+{pagination && (
+  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+    <div className="text-sm text-gray-600 dark:text-gray-400">
+      Showing <span className="font-semibold">{pagination.from}</span> to{' '}
+      <span className="font-semibold">{pagination.to}</span> of{' '}
+      <span className="font-semibold">{pagination.total}</span> reports
+    </div>
+    
+    <div className="flex items-center gap-4">
+      {/* Items per page selector */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-gray-600 dark:text-gray-400">Show:</label>
+        <select
+          value={perPage}
+          onChange={(e) => handlePerPageChange(Number(e.target.value))}
+          className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:text-white"
+        >
+          <option value="10">10</option>
+          <option value="15">15</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+        <span className="text-sm text-gray-600 dark:text-gray-400">per page</span>
+      </div>
+      
+      {/* Pagination buttons */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          <span className="sr-only">Previous</span>
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        
+        {/* Page numbers */}
+        {pagination.links.slice(1, -1).map((link, index) => (
+          <button
+            key={index}
+            onClick={() => handlePageChange(parseInt(link.label))}
+            className={`inline-flex items-center justify-center h-9 min-w-9 px-2 rounded-lg border transition-colors ${
+              link.active
+                ? 'bg-red-600 border-red-600 text-white'
+                : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            {link.label}
+          </button>
+        ))}
+        
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === pagination.last_page}
+          className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          <span className="sr-only">Next</span>
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
           </div>
         </div>
 

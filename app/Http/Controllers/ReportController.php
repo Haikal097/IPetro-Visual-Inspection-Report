@@ -484,22 +484,14 @@ class ReportController extends Controller
             });
         }
 
-        $reports = $query->orderBy('creation_date', 'desc')->get();
+        // ✅ ADD PAGINATION: Get paginated results (15 per page)
+        $perPage = $request->per_page ?? 15;
+        $reports = $query->orderBy('creation_date', 'desc')->paginate($perPage);
 
-        // ✅ CHANGED (necessary): include the extra statuses in stats
-        $stats = [
-            'total' => $reports->count(),
-            'draft' => $reports->where('status', 'draft')->count(),
-            'submitted' => $reports->where('status', 'submitted')->count(),
-            'approved' => $reports->where('status', 'approved')->count(),
-            'rejected' => $reports->where('status', 'rejected')->count(),
-            'in_review' => $reports->where('status', 'in_review')->count(),
-            'revisions_requested' => $reports->where('status', 'revisions_requested')->count(),
-        ];
+        // ✅ CHANGED: Get all IDs from paginated results
+        $reportIds = $reports->pluck('id')->all();
 
         // ✅ ADDED (necessary): fetch all review logs in ONE query (no N+1)
-        $reportIds = $reports->map(fn($r) => $r->getKey())->values()->all();
-
         $logsByReportId = \App\Models\ReportReviewLog::whereIn('report_id', $reportIds)
             ->orderBy('created_at', 'desc')
             ->get()
@@ -555,7 +547,25 @@ class ReportController extends Controller
 
         return inertia('Reports/IndexInspector', [
             'reports' => $mappedReports,
-            'stats' => $stats,
+            // ✅ ADD PAGINATION DATA: Include pagination metadata
+            'pagination' => [
+                'current_page' => $reports->currentPage(),
+                'per_page' => $reports->perPage(),
+                'total' => $reports->total(),
+                'last_page' => $reports->lastPage(),
+                'from' => $reports->firstItem(),
+                'to' => $reports->lastItem(),
+                'links' => $reports->linkCollection()->toArray(),
+            ],
+            'stats' => [
+                'total' => $reports->total(),
+                'draft' => $reports->where('status', 'draft')->count(),
+                'submitted' => $reports->where('status', 'submitted')->count(),
+                'approved' => $reports->where('status', 'approved')->count(),
+                'rejected' => $reports->where('status', 'rejected')->count(),
+                'in_review' => $reports->where('status', 'in_review')->count(),
+                'revisions_requested' => $reports->where('status', 'revisions_requested')->count(),
+            ],
             'filters' => [
                 'status' => $request->status ?? 'all',
                 'q' => $request->q ?? '',
