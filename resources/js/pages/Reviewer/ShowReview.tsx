@@ -108,6 +108,22 @@ export default function ShowReview({ report }: { report: any }) {
       setShowPrintPreview(true);
   };
 
+  
+
+    const formatDateTime = (dateString?: string | null) => {
+    if (!dateString) return 'N/A';
+
+    // Convert "YYYY-MM-DD HH:mm:ss" → ISO
+    const isoString = dateString.replace(' ', 'T');
+
+    const date = new Date(isoString);
+
+    return `${date.toLocaleDateString('en-GB')} ${date.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+    })}`;
+    };
+
 
   const validPhotoItems = report.photo_report_items?.filter((item: any) =>
     item.title || item.findings || item.image || item.requirements
@@ -188,7 +204,7 @@ export default function ShowReview({ report }: { report: any }) {
                   </div>
                   <p className="mt-1.5 text-gray-600 dark:text-gray-400 text-lg">
                     Report No: {report.report_number || report.report_data?.reportNo || 'N/A'} •
-                    Created: {report.created_at?.split(' ')[0] || 'N/A'}
+                    Created: {formatDateTime(report.created_at)}
                   </p>
                 </div>
               </div>
@@ -260,19 +276,23 @@ export default function ShowReview({ report }: { report: any }) {
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Report Date</p>
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {report.report_data?.reportDate || report.inspection_date || 'N/A'}
+                            {formatDateTime(
+                              report.report_data?.reportDate
+                                ? `${report.report_data.reportDate} 00:00:00`
+                                : report.inspection_date
+                            )}
                           </p>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Inspection Date</p>
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {report.report_data?.inspectionDate || 'N/A'}
+                            {formatDateTime(report.report_data?.inspectionDate)}
                           </p>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Publish Date</p>
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {report.report_data?.publishDate || 'N/A'}
+                            {formatDateTime(report.report_data?.publishDate)}
                           </p>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
@@ -318,30 +338,20 @@ export default function ShowReview({ report }: { report: any }) {
                     {/* Quick Stats */}
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Stats</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {report.photo_report_items?.length || 0}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Photo Items</p>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {report.photo_report_items?.filter((item: any) => item.image).length || 0}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Photos</p>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {report.photo_reports?.length || 0}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Photo Reports</p>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {report.signed_at ? 'Signed' : 'Not Signed'}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Signature Status</p>
+                      <div className="flex justify-center">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max--2xl">
+                          <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                              {report.photo_report_items?.length || 0}
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Photo Items</p>
+                          </div>
+                          <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                              {report.photo_report_items?.filter((item: any) => item.image).length || 0}
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Photos</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -478,34 +488,57 @@ export default function ShowReview({ report }: { report: any }) {
                   <div className="space-y-6">
                     {/* Report Metadata - More Compact */}
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Report Metadata</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                        Report Metadata
+                      </h3>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Report ID</p>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white break-all">{reportId ?? 'N/A'}</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white break-all">
+                            {reportId ?? 'N/A'}
+                          </p>
                         </div>
+
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Report Number</p>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.report_number}</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">
+                            {report.report_number}
+                          </p>
                         </div>
+
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Status</p>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white">{currentStatus}</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">
+                            {currentStatus}
+                          </p>
                         </div>
+
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Last Updated</p>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.updated_at}</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">
+                            {formatDateTime(report.updated_at)}
+                          </p>
                         </div>
+
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Created</p>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.created_at}</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">
+                            {formatDateTime(report.created_at)}
+                          </p>
                         </div>
+
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Submitted</p>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white">{report.submission_date || 'Not Submitted'}</p>
+                          <p className="font-medium text-sm text-gray-900 dark:text-white">
+                            {report.submission_date
+                              ? formatDateTime(report.submission_date)
+                              : 'Not Submitted'}
+                          </p>
                         </div>
                       </div>
                     </div>
+
 
                     {/* Photo Reports Summary */}
                     {report.photo_reports && report.photo_reports.length > 0 && (
@@ -548,7 +581,7 @@ export default function ShowReview({ report }: { report: any }) {
                                 <div>
                                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Inspection Date</p>
                                   <p className="font-medium text-gray-900 dark:text-white">
-                                    {photoReport.inspection_date?.split('T')[0] || 'N/A'}
+                                    {formatDateTime(photoReport.inspection_date)}
                                   </p>
                                 </div>
                               </div>
@@ -560,7 +593,7 @@ export default function ShowReview({ report }: { report: any }) {
                               )}
                               <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                                 <p className="text-xs text-gray-500">
-                                  Photo Report ID: {photoReport.id} • Created: {photoReport.created_at}
+                                  Photo Report ID: {photoReport.id} • Created: {formatDateTime(photoReport.created_at)}
                                 </p>
                               </div>
                             </div>
@@ -681,37 +714,29 @@ export default function ShowReview({ report }: { report: any }) {
                     {report.reviewer_id || 'Not Assigned'}
                   </p>
                 </div>
-                <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Signed At</p>
-                    <p className={`text-sm font-medium ${report.signed_at ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>
-                      {report.signed_at || 'Not Signed'}
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
 
             {/* Timeline Panel */}
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Timeline</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Timeline
+              </h3>
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Created</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {report.created_at?.split(' ')[0] || 'N/A'}
+                    {formatDateTime(report.created_at)}
                   </p>
                 </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Last Updated</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {report.updated_at?.split(' ')[0] || 'N/A'}
-                  </p>
-                </div>
+
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Submission Date</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {report.submission_date?.split(' ')[0] || 'Not Submitted'}
+                    {report.updated_at
+                      ? formatDateTime(report.updated_at)
+                      : 'Not Submitted'}
                   </p>
                 </div>
               </div>
