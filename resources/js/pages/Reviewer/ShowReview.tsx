@@ -108,6 +108,68 @@ export default function ShowReview({ report }: { report: any }) {
       setShowPrintPreview(true);
   };
 
+  // Helper function to download images one by one (fallback)
+const downloadImagesIndividually = (items: any[]) => {
+  items.forEach((item, index) => {
+    setTimeout(() => {
+      const link = document.createElement('a');
+      link.href = item.image;
+      link.download = `${item.title || `photo-item-${index + 1}`}-${item.id}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, index * 300); // Stagger downloads to avoid browser blocking
+  });
+  
+  if (items.length > 1) {
+    alert(`Started downloading ${items.length} images. They will download one by one.`);
+  }
+};
+
+// Helper function to download images as ZIP (requires JSZip library)
+const downloadImagesAsZip = async (items: any[]) => {
+  try {
+    // Dynamically import JSZip if not already loaded
+    const JSZip = (window as any).JSZip;
+    const zip = new JSZip();
+    
+    // Show loading message
+    alert(`Preparing ZIP file with ${items.length} images...`);
+    
+    // Fetch and add each image to the ZIP
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      try {
+        const response = await fetch(item.image);
+        const blob = await response.blob();
+        const filename = `${item.title || `photo-item-${i + 1}`}-${item.id}.jpg`;
+        zip.file(filename, blob);
+      } catch (error) {
+        console.error(`Failed to fetch image ${i + 1}:`, error);
+      }
+    }
+    
+    // Generate ZIP file
+    const content = await zip.generateAsync({ type: 'blob' });
+    
+    // Download the ZIP
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(content);
+    link.download = `report-${reportId || 'images'}-photos.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    URL.revokeObjectURL(link.href);
+    
+  } catch (error) {
+    console.error('Failed to create ZIP file:', error);
+    alert('Failed to create ZIP file. Falling back to individual downloads.');
+    downloadImagesIndividually(items);
+  }
+};
+
   
 
     const formatDateTime = (dateString?: string | null) => {
@@ -131,6 +193,13 @@ export default function ShowReview({ report }: { report: any }) {
 
   const [currentStatus, setCurrentStatus] = useState(report.status);
   const [isPrinting, setIsPrinting] = useState(false);
+
+  const [selectedImage, setSelectedImage] = useState<{
+    url: string;
+    title: string;
+    id: number;
+    index: number;
+  } | null>(null);
 
   const canReview = ['submitted', 'in_review'].includes(report.status);
 
@@ -228,6 +297,151 @@ export default function ShowReview({ report }: { report: any }) {
             </div>*/}
           </div>
         </div>
+
+        {/* Image Modal for Magnification */}
+        {selectedImage && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+            onClick={() => setSelectedImage(null)}
+          >
+            <div 
+              className="relative max-w-4xl max-h-[90vh] w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setSelectedImage(null)}
+                className="absolute top-4 right-4 z-10 bg-black/70 text-white p-2 rounded-full hover:bg-black/90 transition-colors"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-6 w-6" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M6 18L18 6M6 6l12 12" 
+                  />
+                </svg>
+              </button>
+              
+              {/* Download button */}
+              <button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = selectedImage.url;
+                  link.download = `${selectedImage.title}-${selectedImage.id}.jpg`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="absolute top-4 left-4 z-10 bg-black/70 text-white p-2 rounded-lg hover:bg-black/90 transition-colors flex items-center gap-2"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-5 w-5" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" 
+                  />
+                </svg>
+                <span className="text-sm">Download</span>
+              </button>
+              
+              {/* Image info */}
+              <div className="absolute bottom-4 left-4 z-10 bg-black/70 text-white p-3 rounded-lg">
+                <p className="font-medium">{selectedImage.title}</p>
+                <p className="text-sm opacity-80">ID: {selectedImage.id} • Item {selectedImage.index + 1}</p>
+              </div>
+              
+              {/* Magnified Image */}
+              <img
+                src={selectedImage.url}
+                alt={selectedImage.title}
+                className="w-full h-full object-contain max-h-[80vh] rounded-lg"
+              />
+              
+              {/* Navigation buttons if you want to browse through images */}
+              {validPhotoItems && validPhotoItems.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const prevIndex = selectedImage.index > 0 ? selectedImage.index - 1 : validPhotoItems.length - 1;
+                      const prevItem = validPhotoItems[prevIndex];
+                      if (prevItem?.image) {
+                        setSelectedImage({
+                          url: prevItem.image,
+                          title: prevItem.title || `Item ${prevIndex + 1}`,
+                          id: prevItem.id,
+                          index: prevIndex
+                        });
+                      }
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/70 text-white p-3 rounded-full hover:bg-black/90 transition-colors"
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="h-6 w-6" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M15 19l-7-7 7-7" 
+                      />
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const nextIndex = selectedImage.index < validPhotoItems.length - 1 ? selectedImage.index + 1 : 0;
+                      const nextItem = validPhotoItems[nextIndex];
+                      if (nextItem?.image) {
+                        setSelectedImage({
+                          url: nextItem.image,
+                          title: nextItem.title || `Item ${nextIndex + 1}`,
+                          id: nextItem.id,
+                          index: nextIndex
+                        });
+                      }
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/70 text-white p-3 rounded-full hover:bg-black/90 transition-colors"
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="h-6 w-6" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M9 5l7 7-7 7" 
+                      />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -426,9 +640,60 @@ export default function ShowReview({ report }: { report: any }) {
                 {/* PHOTO ITEMS TAB */}
                 {activeTab === 'photo-items' && (
                   <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      Photo Report Items ({validPhotoItems?.length || 0})
-                    </h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Photo Report Items ({validPhotoItems?.length || 0})
+                      </h3>
+                      
+                      {/* Bulk Download Button */}
+                      {validPhotoItems?.some((item: any) => item.image) && (
+                        <button
+                          onClick={() => {
+                            // Get all items with images
+                            const itemsWithImages = validPhotoItems.filter((item: any) => item.image);
+                            
+                            if (itemsWithImages.length === 0) {
+                              alert('No images available to download.');
+                              return;
+                            }
+                            
+                            if (itemsWithImages.length > 10) {
+                              const confirmDownload = confirm(
+                                `You are about to download ${itemsWithImages.length} images. This may take a moment. Continue?`
+                              );
+                              if (!confirmDownload) return;
+                            }
+                            
+                            // Create a ZIP file using JSZip library
+                            // First, check if JSZip is available
+                            if (typeof window !== 'undefined' && (window as any).JSZip) {
+                              downloadImagesAsZip(itemsWithImages);
+                            } else {
+                              // Fallback: download images one by one
+                              downloadImagesIndividually(itemsWithImages);
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/25 shadow-md"
+                          title="Download all images as ZIP"
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-4 w-4" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={2} 
+                              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
+                            />
+                          </svg>
+                          Download All Images ({validPhotoItems.filter((item: any) => item.image).length})
+                        </button>
+                      )}
+                    </div>
 
                     {validPhotoItems?.length > 0 ? (
                       <div className="space-y-4">
@@ -436,12 +701,76 @@ export default function ShowReview({ report }: { report: any }) {
                           <div key={item.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                             <div className="flex items-start gap-4">
                               {item.image && (
-                                <div className="flex-shrink-0">
-                                  <img
-                                    src={item.image}
-                                    alt={item.title || `Photo ${index + 1}`}
-                                    className="w-32 h-32 object-cover rounded-lg"
-                                  />
+                                <div className="flex-shrink-0 relative">
+                                  {/* Image container - click opens modal */}
+                                  <div 
+                                    className="w-32 h-32 overflow-hidden rounded-lg cursor-pointer relative group"
+                                    onClick={() => {
+                                      // Open modal with this image
+                                      setSelectedImage({
+                                        url: item.image,
+                                        title: item.title || `Item ${index + 1}`,
+                                        id: item.id,
+                                        index: index
+                                      });
+                                    }}
+                                  >
+                                    <img
+                                      src={item.image}
+                                      alt={item.title || `Photo ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    
+                                    {/* Magnify icon overlay (appears on hover) */}
+                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <div className="bg-white/90 p-2 rounded-full">
+                                        <svg 
+                                          xmlns="http://www.w3.org/2000/svg" 
+                                          className="h-6 w-6 text-gray-800" 
+                                          fill="none" 
+                                          viewBox="0 0 24 24" 
+                                          stroke="currentColor"
+                                        >
+                                          <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round" 
+                                            strokeWidth={2} 
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" 
+                                          />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Download button - positioned separately, doesn't interfere with modal click */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevent opening modal when clicking download
+                                      const link = document.createElement('a');
+                                      link.href = item.image;
+                                      link.download = `${item.title || `photo-item-${index + 1}`}-${item.id}.jpg`;
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    }}
+                                    className="absolute -bottom-2 -right-2 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
+                                    title="Download this image"
+                                  >
+                                    <svg 
+                                      xmlns="http://www.w3.org/2000/svg" 
+                                      className="h-4 w-4" 
+                                      fill="none" 
+                                      viewBox="0 0 24 24" 
+                                      stroke="currentColor"
+                                    >
+                                      <path 
+                                        strokeLinecap="round" 
+                                        strokeLinejoin="round" 
+                                        strokeWidth={2} 
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" 
+                                      />
+                                    </svg>
+                                  </button>
                                 </div>
                               )}
 
