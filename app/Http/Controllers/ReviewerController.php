@@ -640,30 +640,35 @@ class ReviewerController extends Controller
         ]);
     }
 
-    public function approve(Report $report)
+    public function approve(Request $request, Report $report)
     {
         abort_unless(Auth::user()?->role === 'reviewer' || Auth::user()?->role === 'admin', 403);
 
-        abort_unless(in_array($report->status, ['submitted', 'in_review']), 403);
+        abort_unless(in_array($report->status, ['submitted', 'in_review', 'revisions_requested']), 403);
+
+        // ✅ ADDED: Validate optional message like reject function
+        $request->validate([
+            'message' => 'nullable|string|max:2000',
+        ]);
 
         $report->update([
             'status' => 'approved',
             'reviewer_id' => Auth::id(),
-            'signed_at' => now(), // ⚠️ NOTE: keep as-is (you asked “don’t change”), but ideally use approved_at/reviewed_at instead
+            'signed_at' => now(),
         ]);
 
         ReportReviewLog::create([
-            'report_id' => $report->getKey(), // ✅ FIX
+            'report_id' => $report->getKey(),
             'reviewer_id' => Auth::id(),
             'action' => 'approved',
-            'message' => null,
+            'message' => $request->message, // ✅ ADDED: Store optional approval message
         ]);
 
-        // ✅ ADDED: send notification to inspector/creator
+        // ✅ ADDED: send notification to inspector/creator with message
         $report->loadMissing('creator');
-        $report->creator?->notify(new ReportApproved($report, Auth::user()));
+        $report->creator?->notify(new ReportApproved($report, $request->message, Auth::user()));
 
-        return back()->with('success', 'Report approved.');
+        return back()->with('success', 'Report approved successfully.');
     }
 
     public function reject(Request $request, Report $report)
