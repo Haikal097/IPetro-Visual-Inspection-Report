@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\AiReportReviewController;
 use App\Http\Controllers\Api\AiInspectorChatHistoryController;
 use App\Http\Controllers\Api\AiReportReviewHistoryController;
 use App\Http\Controllers\ReviewAnalyticsController;
+use App\Http\Controllers\AdminInspectionController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -128,6 +129,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return Inertia::render('calendar/InspectionCalendar');
         })->name('calendar');
     });
+
     /*
     |--------------------------------------------------------------------------
     | Notifications
@@ -142,6 +144,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/test', [NotificationController::class, 'sendTest'])
         ->middleware(['auth'])
         ->name('notifications.test');
+
+    Route::put('/inspection-calendar/{inspection}/status', [InspectionCalendarController::class, 'setStatus'])
+        ->middleware(['auth', 'role:inspector'])
+        ->name('inspection.calendar.status');
 
     /*
     |--------------------------------------------------------------------------
@@ -222,14 +228,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Review Analytics Page
         Route::get('/reviews/analytics', ReviewAnalyticsController::class)->name('reviews.analytics');
     });
+
     /*
-    
     |--------------------------------------------------------------------------
     | Single report page (Reviewer and Inspector)
     |--------------------------------------------------------------------------
     */
-    
-        Route::get('/report/show/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
+    Route::get('/report/show/{report}', [ReviewerController::class, 'showReview'])->name('reports.showReview');
 
     /*
     |--------------------------------------------------------------------------
@@ -244,6 +249,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('admin.users.resetPassword');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
         Route::post('/users/bulk-actions', [UserController::class, 'bulkActions'])->name('admin.users.bulkActions');
+
+        // ✅ Admin Inspection Scheduler (A) - placed here to avoid duplicates
+        Route::get('/inspection-scheduler', [AdminInspectionController::class, 'index'])->name('admin.inspections.index');
+        Route::get('/inspection-scheduler/events', [AdminInspectionController::class, 'events'])->name('admin.inspections.events');
+        Route::post('/inspection-scheduler', [AdminInspectionController::class, 'store'])->name('admin.inspections.store');
+        Route::put('/inspection-scheduler/{inspection}', [AdminInspectionController::class, 'update'])->name('admin.inspections.update');
+        Route::delete('/inspection-scheduler/{inspection}', [AdminInspectionController::class, 'destroy'])->name('admin.inspections.destroy');
     });
 
     /*
@@ -256,15 +268,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/albums/{album}', [AlbumController::class, 'update'])->name('albums.update');
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
 
-
     /*
     |--------------------------------------------------------------------------
     | Report Fix
     |--------------------------------------------------------------------------
     */
     Route::get('/reports/{report}/edit', [ReportController::class, 'edit'])
-    ->name('reports.edit');
-
+        ->name('reports.edit');
 });
 
 /*
@@ -287,8 +297,7 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
 
     // inspector chat (choose one controller)
     Route::post('/ai/inspector-chat', [AiInspectorChatController::class, 'chat'])
-    ->name('ai.inspector-chat');
-
+        ->name('ai.inspector-chat');
 
     // report analysis
     Route::post('/ai/report-analysis', [InspectorAiController::class, 'analyze'])
@@ -300,23 +309,21 @@ Route::prefix('api')->middleware(['auth'])->group(function () {
 
     // report review assistant
     Route::post('/ai/report-review-assistant', AiReportReviewAssistantController::class)
-    ->name('ai.report-review-assistant');
-
+        ->name('ai.report-review-assistant');
 
     //ai inspector chat history
     Route::get('/ai/inspector-chat/sessions', [AiInspectorChatHistoryController::class, 'sessions'])
-    ->name('ai.inspector-chat.sessions');
+        ->name('ai.inspector-chat.sessions');
 
-Route::get('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryController::class, 'messages'])
-    ->name('ai.inspector-chat.messages');
+    Route::get('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryController::class, 'messages'])
+        ->name('ai.inspector-chat.messages');
 
-Route::delete('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryController::class, 'delete'])
-    ->name('ai.inspector-chat.delete');
+    Route::delete('/ai/inspector-chat/sessions/{session}', [AiInspectorChatHistoryController::class, 'delete'])
+        ->name('ai.inspector-chat.delete');
 
     Route::get('/ai/report-review-history', [AiReportReviewHistoryController::class, 'index']);
     Route::get('/ai/report-review-history/{id}', [AiReportReviewHistoryController::class, 'show']);
     Route::delete('/ai/report-review-history/{id}', [AiReportReviewHistoryController::class, 'destroy']);
-
 
     /*
     |----------------------------------------------------------------------

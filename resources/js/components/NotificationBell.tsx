@@ -47,6 +47,23 @@ export default function NotificationBell() {
     };
   }
 
+  // ✅ ADDED (fix 419 for axios calls): set default CSRF headers + cookies once
+  useEffect(() => {
+    axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
+
+    const token =
+      (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? "";
+    if (token) axios.defaults.headers.common["X-CSRF-TOKEN"] = token;
+
+    axios.defaults.withCredentials = true;
+
+    // ✅ ADDED
+    axios.defaults.baseURL = window.location.origin;
+    axios.defaults.xsrfCookieName = "XSRF-TOKEN";
+    axios.defaults.xsrfHeaderName = "X-XSRF-TOKEN";
+  }, []);
+
+
   async function load() {
     try {
       setLoading(true);
@@ -86,11 +103,11 @@ export default function NotificationBell() {
     // Prefer backend url if provided
     if (n.url) return n.url;
 
-    // Inspection notification
-    if (n.inspection_id) return `/inspection-calendar?inspection=${n.inspection_id}`;
-
-    // Report notification
+    // ✅ ADDED: if notification has report_id, go PV report (this is what you want for Start)
     if (n.report_id) return `/pv-report/${n.report_id}`;
+
+    // Inspection notification fallback
+    if (n.inspection_id) return `/inspection-calendar?inspection=${n.inspection_id}`;
 
     // fallback
     return "/dashboard";
@@ -105,6 +122,32 @@ export default function NotificationBell() {
     router.visit(target);
 
     setOpen(false);
+  };
+
+  const setInspectionStatus = async (inspectionId: number, status: string) => {
+    await axios.put(
+      `/inspection-calendar/${inspectionId}/status`,
+      { status },
+      { headers: csrfHeaders() }
+    );
+    await load();
+  };
+
+  // ✅ ADDED: Start/Done helper that updates status AND navigates
+  const setStatusAndGo = async (n: Notif, status: string) => {
+    if (!n.inspection_id) return;
+
+    try {
+      await setInspectionStatus(n.inspection_id, status);
+
+      // ✅ If report_id/url exists -> go to PV report to start writing
+      const target = resolveTargetUrl(n);
+      router.visit(target);
+
+      setOpen(false);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   async function refresh() {
@@ -130,6 +173,19 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  // ✅ ADDED (fix nested button warning): helper props to make a div act like a button
+  const asButtonProps = (onClick: () => void) => ({
+    role: "button" as const,
+    tabIndex: 0,
+    onClick,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick();
+      }
+    },
+  });
+
   return (
     <div className="relative" ref={wrapRef}>
       <button
@@ -138,7 +194,12 @@ export default function NotificationBell() {
         className="relative rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
         aria-label="Notifications"
       >
-        <svg className="h-5 w-5 text-gray-700 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className="h-5 w-5 text-gray-700 dark:text-gray-200"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -185,14 +246,15 @@ export default function NotificationBell() {
           <div className="max-h-[360px] overflow-auto">
             {unread.length > 0 ? (
               <>
-                <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">UNREAD</div>
+                <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">
+                  UNREAD
+                </div>
 
                 {unread.map((n) => (
-                  <button
+                  <div
                     key={n.id}
-                    type="button"
-                    onClick={() => openNotification(n)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900"
+                    {...asButtonProps(() => openNotification(n))}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900 cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -206,19 +268,61 @@ export default function NotificationBell() {
                           </div>
                         )}
 
-                        {/* extra metadata */}
                         <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           {n.status ? `Status: ${n.status}` : ""}
                           {n.tag ? `${n.status ? " • " : ""}Tag: ${n.tag}` : ""}
                           {n.location ? ` • ${n.location}` : ""}
                         </div>
 
-                        {/* long reviewer message */}
                         {n.message ? (
                           <div className="mt-2 text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap line-clamp-3">
                             {n.message}
                           </div>
                         ) : null}
+
+                        {n.inspection_id && !isReviewer && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const target = resolveTargetUrl(n);
+                                router.visit(target);
+                                setOpen(false);
+                              }}
+                              className="text-xs font-semibold px-2 py-1 rounded border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
+                            >
+                              Open
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // ✅ CHANGED BY ADDING: update to in_progress + go to PV report page
+                                setStatusAndGo(n, "in_progress");
+                              }}
+                              className="text-xs font-semibold px-2 py-1 rounded border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
+                            >
+                              Start
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await setInspectionStatus(n.inspection_id!, "in_progress");
+                                const target = resolveTargetUrl(n);
+                                router.visit(target);
+                                setOpen(false);
+                              }}
+
+                              className="text-xs font-semibold px-2 py-1 rounded border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <span className="mt-1 h-2 w-2 rounded-full bg-red-500 shrink-0"></span>
@@ -236,14 +340,32 @@ export default function NotificationBell() {
                         Mark as read
                       </button>
 
-                      {/* optional quick link */}
                       {(n.url || n.report_id || n.inspection_id) && (
-                        <span className="text-xs font-semibold text-red-600 hover:underline">
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const target = resolveTargetUrl(n);
+                            router.visit(target);
+                            setOpen(false);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const target = resolveTargetUrl(n);
+                              router.visit(target);
+                              setOpen(false);
+                            }
+                          }}
+                          className="text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+                        >
                           Review
                         </span>
                       )}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </>
             ) : (
@@ -252,19 +374,18 @@ export default function NotificationBell() {
               </div>
             )}
 
-            <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">RECENT</div>
+            <div className="px-4 pt-3 pb-2 text-xs font-bold text-gray-500 dark:text-gray-400">
+              RECENT
+            </div>
 
             {recent.length ? (
               recent.map((n) => (
-                <button
+                <div
                   key={n.id}
-                  type="button"
-                  onClick={() => openNotification(n)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900"
+                  {...asButtonProps(() => openNotification(n))}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900 cursor-pointer"
                 >
-                  <div className="text-sm text-gray-900 dark:text-white">
-                    {n.title}
-                  </div>
+                  <div className="text-sm text-gray-900 dark:text-white">{n.title}</div>
 
                   {n.message ? (
                     <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
@@ -275,7 +396,7 @@ export default function NotificationBell() {
                       {n.read_at ? "Read" : "Unread"}
                     </div>
                   )}
-                </button>
+                </div>
               ))
             ) : (
               <div className="px-4 pb-4 text-sm text-gray-500 dark:text-gray-400">
@@ -284,7 +405,11 @@ export default function NotificationBell() {
             )}
           </div>
 
-          <div className={`px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center ${isReviewer ? "justify-end" : "justify-between"}`}>
+          <div
+            className={`px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center ${
+              isReviewer ? "justify-end" : "justify-between"
+            }`}
+          >
             {!isReviewer && (
               <Link href="/inspection-calendar" className="text-sm font-semibold text-red-600 hover:underline">
                 Calendar

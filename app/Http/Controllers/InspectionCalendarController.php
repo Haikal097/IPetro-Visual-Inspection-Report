@@ -22,7 +22,10 @@ class InspectionCalendarController extends Controller
     {
         $userId = $request->user()->id;
 
-        $events = Inspection::where('user_id', $userId)
+        $events = Inspection::where(function ($q) use ($userId) {
+                $q->where('assigned_to', $userId)   // ✅ new assignment field
+                ->orWhere('user_id', $userId);    // ✅ fallback for old records
+            })
             ->orderBy('start_at')
             ->get()
             ->map(function ($i) {
@@ -38,12 +41,17 @@ class InspectionCalendarController extends Controller
                         'status' => $i->status,
                         'remind_1d' => (bool) $i->remind_1d,
                         'remind_1h' => (bool) $i->remind_1h,
+
+                        // ✅ optional extras (safe to keep, won’t break FullCalendar)
+                        'assigned_to' => $i->assigned_to,
+                        'created_by' => $i->created_by,
                     ],
                 ];
             });
 
         return response()->json($events);
     }
+
 
     /**
      * Inertia router.post() expects an Inertia response (redirect/back),
@@ -132,4 +140,19 @@ class InspectionCalendarController extends Controller
 
         return back()->with('success', 'Inspection deleted.');
     }
+
+    public function setStatus(Request $request, Inspection $inspection)
+    {
+        $userId = $request->user()->id;
+        abort_unless(($inspection->assigned_to ?? $inspection->user_id) === $userId, 403);
+
+        $data = $request->validate([
+            'status' => ['required', 'in:planned,in_progress,completed,cancelled'],
+        ]);
+
+        $inspection->update(['status' => $data['status']]);
+
+        return response()->json(['success' => true]);
+    }
+
 }
