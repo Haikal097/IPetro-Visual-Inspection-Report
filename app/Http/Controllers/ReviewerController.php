@@ -29,8 +29,7 @@ class ReviewerController extends Controller
 
         $query->whereNotIn('status', ['approved', 'rejected']);
 
-        $query->orderBy('submission_date', 'desc')
-              ->orderBy('created_at', 'desc');
+        $query->orderBy('updated_at', 'desc');
 
         $reports = $query->get()->map(function ($report) {
             $jsonData = [];
