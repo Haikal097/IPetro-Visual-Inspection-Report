@@ -31,7 +31,15 @@ class ReviewerController extends Controller
 
         $query->orderBy('updated_at', 'desc');
 
-        $reports = $query->get()->map(function ($report) {
+        // ✅ ADD PAGINATION: Get paginated results
+        $perPage = $request->per_page ?? 15;
+        $reports = $query->paginate($perPage);
+
+        // ✅ CHANGED: Get all IDs from paginated results
+        $reportIds = $reports->pluck('id')->all();
+
+        // Transform data (your existing mapping logic)
+        $mappedReports = $reports->map(function ($report) use ($reportIds) {
             $jsonData = [];
             if ($report->json_data) {
                 try {
@@ -124,18 +132,20 @@ class ReviewerController extends Controller
             ];
         });
 
-        $totalPending = $reports->where('status', 'pending')->count();
-        $inReview = $reports->where('status', 'in-review')->count();
-        $revisionsNeeded = $reports->where('status', 'revisions-requested')->count();
+        // ✅ UPDATE: Get stats from paginated results
+        $totalPending = $mappedReports->where('status', 'pending')->count();
+        $inReview = $mappedReports->where('status', 'in-review')->count();
+        $revisionsNeeded = $mappedReports->where('status', 'revisions-requested')->count();
 
-        $completedToday = Report::whereDate('updated_at', today())
+        // For total stats (all time, not just current page)
+        $totalCompletedToday = Report::whereDate('updated_at', today())
             ->whereIn('status', ['approved', 'rejected'])
             ->count();
 
         $avgReviewTime = $this->calculateAverageReviewTime();
         $approvalRate = $this->calculateApprovalRate();
 
-        $overdueReviews = $reports->filter(function ($report) {
+        $overdueReviews = $mappedReports->filter(function ($report) {
             if ($report['status'] !== 'pending') return false;
 
             $submissionDate = $report['submission_date'] ? Carbon::parse($report['submission_date']) : null;
@@ -144,15 +154,25 @@ class ReviewerController extends Controller
             return $submissionDate->diffInDays(now()) > 3;
         })->count();
 
-        $totalReviews = $reports->count();
+        $totalReviews = $mappedReports->count();
 
         return Inertia::render('Reports/IndexReviewer', [
-            'reviews' => $reports,
+            'reviews' => $mappedReports,
+            // ✅ ADD PAGINATION DATA
+            'pagination' => [
+                'current_page' => $reports->currentPage(),
+                'per_page' => $reports->perPage(),
+                'total' => $reports->total(),
+                'last_page' => $reports->lastPage(),
+                'from' => $reports->firstItem(),
+                'to' => $reports->lastItem(),
+                'links' => $reports->linkCollection()->toArray(),
+            ],
             'stats' => [
                 'total_pending' => $totalPending,
                 'in_review' => $inReview,
                 'revisions_needed' => $revisionsNeeded,
-                'completed_today' => $completedToday,
+                'completed_today' => $totalCompletedToday,
                 'avg_review_time' => $avgReviewTime,
                 'approval_rate' => $approvalRate,
                 'overdue_reviews' => $overdueReviews,
