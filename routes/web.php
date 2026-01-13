@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\AiReportReviewAssistantController;
 use App\Http\Controllers\Api\AiReportReviewController;
 use App\Http\Controllers\Api\AiInspectorChatHistoryController;
 use App\Http\Controllers\Api\AiReportReviewHistoryController;
+use App\Http\Controllers\ReviewAnalyticsController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -217,6 +218,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/review/{report}/approve', [ReviewerController::class, 'approve'])->name('review.approve');
         Route::post('/review/{report}/reject', [ReviewerController::class, 'reject'])->name('review.reject');
         Route::post('/review/{report}/request-revision', [ReviewerController::class, 'requestRevision'])->name('review.requestRevision');
+
+        // Review Analytics Page
+        Route::get('/reviews/analytics', ReviewAnalyticsController::class)->name('reviews.analytics');
     });
     /*
     
