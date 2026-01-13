@@ -238,6 +238,9 @@ export default function PhotoReport() {
     console.log("JSON file generated:", fileName);
   };
 
+  const renumberItems = (items: ReportItem[]) =>
+  items.map((it, idx) => ({ ...it, id: idx + 1 }));
+
   // Initialize/load from backend only
   useEffect(() => {
     const loadReportData = async () => {
@@ -536,17 +539,34 @@ export default function PhotoReport() {
 
   const addItem = () => {
     if (!data) return;
-    const newId = Date.now();
-    const newItem: ReportItem = { id: newId, title: "", findings: "", requirements: "", image: null };
+
+    const newId = data.items.length + 1;
+
+    const newItem: ReportItem = {
+      id: newId,
+      title: "",
+      findings: "",
+      requirements: "",
+      image: null,
+    };
+
     saveData({ ...data, items: [...data.items, newItem] });
   };
 
+
   const deleteItem = (id: ItemId) => {
-    if(isReadOnly) return;
+    if (isReadOnly) return;
     if (!data) return;
     if (!window.confirm("Delete this item row?")) return;
-    saveData({ ...data, items: data.items.filter((i) => i.id !== id) });
+
+    const filtered = data.items.filter((i) => i.id !== id);
+
+    // ✅ re-number IDs to 1..N
+    const renumbered = renumberItems(filtered);
+
+    saveData({ ...data, items: renumbered });
   };
+
 
   useEffect(() => {
     if (!data) return;
