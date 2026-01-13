@@ -26,6 +26,44 @@ type WorstReport = {
   keywords?: Record<string, number>;
 };
 
+/** ✅ ADD ONLY: AI Risk Score type */
+type RiskScore = {
+  report_id: number;
+  report_title?: string;
+  report_number?: string;
+  report_status?: string;
+  score: number; // 0-100
+  level: "Low" | "Medium" | "High" | string;
+  reasons?: string[];
+  stats?: {
+    defect_count?: number;
+    inconsistent_count?: number;
+    severe_hits?: number;
+    short_findings?: number;
+  };
+};
+
+/** ✅ ADD ONLY: Gemini Risk Assessment (saved in DB) */
+type AiRiskAssessment = {
+  report_id: number;
+  score: number;
+  level: string;
+
+  // original UI keys
+  why?: string | null;
+  confidence?: "low" | "medium" | "high" | string | null;
+  recommendation?: string | null;
+  model?: string | null;
+
+  // ✅ ADD ONLY: DB column names from ai_report_risk_assessments migration
+  ai_explanation?: string | null;
+  ai_confidence?: "low" | "medium" | "high" | string | null;
+  ai_recommendation?: string | null;
+  ai_model?: string | null;
+
+  created_at?: string | null;
+};
+
 type Props = {
   filters: {
     timeframe: "all" | "week" | "month" | "3months";
@@ -56,13 +94,19 @@ type Props = {
     /** ✅ ADD ONLY: new fields returned by controller */
     keywordCounts?: KeywordCount[];
     worstReports?: WorstReport[];
+
+    /** ✅ ADD ONLY: AI Risk Score list returned by controller */
+    riskScores?: RiskScore[];
   };
   ai: null | {
     countsByAction: Record<string, number>;
   };
+
+  /** ✅ ADD ONLY: controller returns this */
+  aiRiskAssessments?: AiRiskAssessment[];
 };
 
-export default function Analytics({ filters, workload, risk, ai }: Props) {
+export default function Analytics({ filters, workload, risk, ai, aiRiskAssessments }: Props) {
   const statuses = useMemo(() => {
     const all = { ...workload.statusCounts };
     const order = ["draft", "submitted", "in_review", "revisions_requested", "approved", "rejected", "closed"];
@@ -81,6 +125,34 @@ export default function Analytics({ filters, workload, risk, ai }: Props) {
   const setTimeframe = (v: Props["filters"]["timeframe"]) => {
     router.get("/reviews/analytics", { timeframe: v }, { preserveScroll: true, preserveState: true });
   };
+
+  /** ✅ ADD ONLY: simple badge style for risk level */
+  const riskBadge = (level?: string) => {
+    const v = String(level || "").toLowerCase();
+    if (v === "high")
+      return "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800";
+    if (v === "medium")
+      return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800";
+    return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800";
+  };
+
+  /** ✅ ADD ONLY: confidence badge */
+  const confidenceBadge = (c?: string | null) => {
+    const v = String(c || "").toLowerCase();
+    if (v === "high") return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800";
+    if (v === "medium") return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800";
+    if (v === "low") return "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700";
+    return "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700";
+  };
+
+  /** ✅ ADD ONLY: map report_id -> ai assessment for fast lookup */
+  const aiByReportId = useMemo(() => {
+    const map = new Map<number, AiRiskAssessment>();
+    (aiRiskAssessments || []).forEach((x) => {
+      if (x?.report_id) map.set(Number(x.report_id), x);
+    });
+    return map;
+  }, [aiRiskAssessments]);
 
   return (
     <AppLayout breadcrumbs={[{ title: "Review Analytics", href: "/reviews/analytics" }]}>
@@ -376,9 +448,147 @@ export default function Analytics({ filters, workload, risk, ai }: Props) {
         </div>
         {/* ====================== END DEFECT OVERVIEW ====================== */}
 
+        {/* ====================== AI RISK SCORE PER REPORT (ADD ONLY) ====================== */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 mt-6">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                AI Risk Score (per report)
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Score is calculated from defect mentions + inconsistencies + severe keywords + short findings (no overdue logic).
+              </p>
+            </div>
+          </div>
+
+          {Array.isArray((risk as any)?.riskScores) && (risk as any).riskScores.length > 0 ? (
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-800/50">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300">Report</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300">Risk</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300">Score</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300">Reasons</th>
+
+                    {/* ✅ ADD ONLY */}
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300">AI explanation</th>
+
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {(risk as any).riskScores.map((r: any, idx: number) => {
+                    const aiRow = aiByReportId.get(Number(r.report_id));
+
+                    // ✅ ADD ONLY: fallback to DB field names
+                    const why = aiRow?.why ?? aiRow?.ai_explanation ?? null;
+                    const confidence = aiRow?.confidence ?? aiRow?.ai_confidence ?? null;
+                    const recommendation = aiRow?.recommendation ?? aiRow?.ai_recommendation ?? null;
+                    const model = aiRow?.model ?? aiRow?.ai_model ?? null;
+
+                    return (
+                      <tr key={`${r.report_id}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                        <td className="px-4 py-3">
+                          <div className="text-gray-900 dark:text-white font-semibold">
+                            {r.report_title || `Report #${r.report_id}`}
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            Report ID: {r.report_id}
+                            {r.report_number ? <> • No: {r.report_number}</> : null}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                          {r.report_status ?? "-"}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${riskBadge(r.level)}`}>
+                            {r.level || "Low"}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-gray-900 dark:text-white">{r.score ?? 0}/100</div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="text-gray-700 dark:text-gray-200">
+                            {Array.isArray(r.reasons) && r.reasons.length > 0 ? (
+                              <ul className="list-disc pl-4 space-y-1">
+                                {r.reasons.slice(0, 4).map((x: string, i: number) => (
+                                  <li key={i}>{x}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-gray-500 dark:text-gray-400">-</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* ✅ ADD ONLY: Gemini explanation + confidence + recommendation */}
+                        <td className="px-4 py-3 align-top">
+                          {aiRow ? (
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${confidenceBadge(confidence)}`}>
+                                  Confidence: {confidence ?? "unknown"}
+                                </span>
+                                {model ? (
+                                  <span className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
+                                    {model}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {why ? (
+                                <div className="text-sm text-gray-800 dark:text-gray-200">
+                                  <span className="font-semibold">Why:</span> {why}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">No explanation available.</div>
+                              )}
+
+                              {false && recommendation ? (
+                                <div className="text-sm text-gray-800 dark:text-gray-200">
+                                  <span className="font-semibold">AI Recommendation:</span> {recommendation}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              No Gemini explanation saved yet.
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 text-right">
+                          <Link
+                            href={`/report/show/${r.report_id}`}
+                            className="inline-flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40"
+                          >
+                            Review
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              No risk scores available yet (no defect/inconsistency signals found in this timeframe).
+            </div>
+          )}
+        </div>
+        {/* ====================== END AI RISK SCORE ====================== */}
+
         {/* Optional AI */}
         {ai && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 mt-6">
             <div className="font-semibold text-gray-900 dark:text-white mb-3">AI Review summary</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {Object.entries(ai.countsByAction || {}).map(([k, v]) => (

@@ -26,7 +26,7 @@ class ReviewAnalyticsController extends Controller
         if ($from) {
             $reportsQ->where(function ($q) use ($from) {
                 $q->where('submission_date', '>=', $from)
-                  ->orWhere('created_at', '>=', $from);
+                    ->orWhere('created_at', '>=', $from);
             });
         }
 
@@ -88,7 +88,7 @@ class ReviewAnalyticsController extends Controller
             ->when($from, function ($q) use ($from) {
                 $q->where(function ($qq) use ($from) {
                     $qq->where('reports.submission_date', '>=', $from)
-                       ->orWhere('reports.created_at', '>=', $from);
+                        ->orWhere('reports.created_at', '>=', $from);
                 });
             });
 
@@ -114,7 +114,7 @@ class ReviewAnalyticsController extends Controller
         $defectItems = [];
         $inconsistentItems = [];
 
-        // ✅ ADD ONLY: counts & worst reports aggregation
+        // ✅ counts & worst reports aggregation
         $keywordCounts = array_fill_keys($keywords, 0);
         $worstByReport = [];
 
@@ -155,7 +155,7 @@ class ReviewAnalyticsController extends Controller
                 $row = [
                     'report_id' => (int)$pr->report_id,
                     'photo_report_id' => (int)$pr->photo_report_id,
-                    'item_index' => $idx,
+                    'item_id' => $idx,
                     'title' => $title,
                     'findings' => $findingsRaw,
                     'requirements' => $requirementsRaw,
@@ -224,7 +224,237 @@ class ReviewAnalyticsController extends Controller
             ];
         }
 
-        // ✅ FIX: match your file path resources/js/pages/Reviewer/Analytics.tsx
+        // ====================== AI RISK SCORE (ADD ONLY, NO OVERDUE) ======================
+
+        $severityKeywords = ['crack', 'leak', 'leakage', 'pitting'];
+
+        $perReport = [];
+
+        foreach ($defectItems as $row) {
+            $rid = (int)($row['report_id'] ?? 0);
+            if (!$rid) continue;
+
+            if (!isset($perReport[$rid])) {
+                $perReport[$rid] = [
+                    'report_id' => $rid,
+                    'report_title' => $row['report_title'] ?? ('Report #' . $rid),
+                    'report_number' => $row['report_number'] ?? '',
+                    'report_status' => $row['report_status'] ?? '',
+                    'defect_count' => 0,
+                    'inconsistent_count' => 0,
+                    'severe_hits' => 0,
+                    'short_findings' => 0,
+                ];
+            }
+
+            $perReport[$rid]['defect_count']++;
+
+            $findingsText = strtolower((string)($row['findings'] ?? ''));
+            foreach ($severityKeywords as $sk) {
+                if (str_contains($findingsText, $sk)) {
+                    $perReport[$rid]['severe_hits']++;
+                }
+            }
+
+            if (mb_strlen(trim((string)($row['findings'] ?? ''))) < 25) {
+                $perReport[$rid]['short_findings']++;
+            }
+        }
+
+        foreach ($inconsistentItems as $row) {
+            $rid = (int)($row['report_id'] ?? 0);
+            if (!$rid) continue;
+
+            if (!isset($perReport[$rid])) {
+                $perReport[$rid] = [
+                    'report_id' => $rid,
+                    'report_title' => $row['report_title'] ?? ('Report #' . $rid),
+                    'report_number' => $row['report_number'] ?? '',
+                    'report_status' => $row['report_status'] ?? '',
+                    'defect_count' => 0,
+                    'inconsistent_count' => 0,
+                    'severe_hits' => 0,
+                    'short_findings' => 0,
+                ];
+            }
+
+            $perReport[$rid]['inconsistent_count']++;
+        }
+
+        $riskReports = [];
+
+        foreach ($perReport as $rid => $st) {
+            $defects = (int)$st['defect_count'];
+            $incons = (int)$st['inconsistent_count'];
+            $severe = (int)$st['severe_hits'];
+            $short = (int)$st['short_findings'];
+
+            $score =
+                min(40, $defects * 8) +
+                min(30, $incons * 15) +
+                min(20, $severe * 10) +
+                min(10, $short * 5);
+
+            $score = max(0, min(100, (int)$score));
+
+            $level = $score >= 70 ? 'High' : ($score >= 40 ? 'Medium' : 'Low');
+
+            $reasons = [];
+            if ($defects > 0) $reasons[] = "Defect mentions: {$defects}";
+            if ($incons > 0) $reasons[] = "Inconsistencies: {$incons}";
+            if ($severe > 0) $reasons[] = "Severe keywords hits: {$severe}";
+            if ($short > 0) $reasons[] = "Short findings items: {$short}";
+            if (empty($reasons)) $reasons[] = "No risk signals detected";
+
+            $riskReports[] = [
+                'report_id' => (int)$st['report_id'],
+                'report_title' => (string)$st['report_title'],
+                'report_number' => (string)$st['report_number'],
+                'report_status' => (string)$st['report_status'],
+                'score' => $score,
+                'level' => $level,
+                'reasons' => $reasons,
+                'stats' => [
+                    'defect_count' => $defects,
+                    'inconsistent_count' => $incons,
+                    'severe_hits' => $severe,
+                    'short_findings' => $short,
+                ],
+            ];
+        }
+
+        usort($riskReports, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
+        $riskReports = array_slice($riskReports, 0, 15);
+
+        // ====================== GEMINI EXPLANATION + SAVE TO DB (FIXED) ======================
+
+        $savedByReportId = [];
+        $aiRiskAssessments = []; // ✅ ADD ONLY: what we return to React
+
+        if (DB::getSchemaBuilder()->hasTable('ai_report_risk_assessments') && !empty($riskReports)) {
+            try {
+                // 1) Load existing for this timeframe (because unique(report_id, timeframe))
+                $ids = array_values(array_unique(array_map(fn($x) => (int)$x['report_id'], $riskReports)));
+
+                $existingRows = DB::table('ai_report_risk_assessments')
+                    ->whereIn('report_id', $ids)
+                    ->where('timeframe', $timeframe)
+                    ->get();
+
+                foreach ($existingRows as $er) {
+                    $savedByReportId[(int)$er->report_id] = $er;
+                }
+
+                // 2) Only send missing ones to Gemini (reduce cost)
+                $missing = [];
+                foreach ($riskReports as $rr) {
+                    $rid = (int)($rr['report_id'] ?? 0);
+                    if (!$rid) continue;
+                    if (!isset($savedByReportId[$rid])) {
+                        $missing[] = $rr;
+                    }
+                }
+
+                // 3) Call Gemini in one batch (your GeminiRiskExplainer already does batch)
+                if (!empty($missing)) {
+                    /** @var \App\Services\GeminiRiskExplainer $explainer */
+                    $explainer = app(\App\Services\GeminiRiskExplainer::class);
+
+                    // keep batch reasonable
+                    $missingBatch = array_slice($missing, 0, 10);
+
+                    $aiList = $explainer->explain($missingBatch, $keywords);
+
+                    // index ai output by report_id
+                    $aiById = [];
+                    foreach ($aiList as $x) {
+                        $rid = (int)($x['report_id'] ?? 0);
+                        if ($rid) $aiById[$rid] = $x;
+                    }
+
+                    foreach ($missingBatch as $rr) {
+                        $rid = (int)($rr['report_id'] ?? 0);
+                        if (!$rid) continue;
+
+                        $aiOut = $aiById[$rid] ?? [];
+
+                        // IMPORTANT: save using YOUR MIGRATION COLUMNS
+                        DB::table('ai_report_risk_assessments')->updateOrInsert(
+                            [
+                                'report_id' => $rid,
+                                'timeframe' => $timeframe,
+                            ],
+                            [
+                                'score' => (int)($rr['score'] ?? 0),
+                                'level' => (string)($rr['level'] ?? 'Low'),
+                                'reasons' => json_encode($rr['reasons'] ?? []),
+
+                                'ai_explanation' => $aiOut['why'] ?? null,
+                                'ai_confidence' => $aiOut['confidence'] ?? null,
+                                'ai_recommendation' => $aiOut['recommendation'] ?? null,
+
+                                'ai_model' => config('services.gemini.model') ?: config('gemini.model') ?: env('GEMINI_MODEL'),
+                                'generated_at' => now(),
+                                'updated_at' => now(),
+                                'created_at' => now(),
+                            ]
+                        );
+                    }
+
+                    // reload rows after save
+                    $existingRows = DB::table('ai_report_risk_assessments')
+                        ->whereIn('report_id', $ids)
+                        ->where('timeframe', $timeframe)
+                        ->get();
+
+                    $savedByReportId = [];
+                    foreach ($existingRows as $er) {
+                        $savedByReportId[(int)$er->report_id] = $er;
+                    }
+                }
+
+                // 4) Attach saved ai fields into riskReports for UI display
+                foreach ($riskReports as &$rr) {
+                    $rid = (int)($rr['report_id'] ?? 0);
+                    $saved = $savedByReportId[$rid] ?? null;
+
+                    $rr['ai_explanation'] = $saved ? ($saved->ai_explanation ?? null) : null;
+                    $rr['ai_confidence'] = $saved ? ($saved->ai_confidence ?? null) : null;
+                    $rr['ai_recommendation'] = $saved ? ($saved->ai_recommendation ?? null) : null;
+                    $rr['ai_model'] = $saved ? ($saved->ai_model ?? null) : null;
+                }
+                unset($rr);
+
+                // ✅ ADD ONLY: build the payload React expects (why/confidence/recommendation/model)
+                foreach ($savedByReportId as $rid => $saved) {
+                    $aiRiskAssessments[] = [
+                        'report_id' => (int)$saved->report_id,
+                        'score' => (int)($saved->score ?? 0),
+                        'level' => (string)($saved->level ?? 'Low'),
+
+                        // map DB fields -> UI fields
+                        'why' => $saved->ai_explanation ?? null,
+                        'confidence' => $saved->ai_confidence ?? null,
+                        'recommendation' => $saved->ai_recommendation ?? null,
+                        'model' => $saved->ai_model ?? null,
+
+                        // also include DB names (optional, harmless)
+                        'ai_explanation' => $saved->ai_explanation ?? null,
+                        'ai_confidence' => $saved->ai_confidence ?? null,
+                        'ai_recommendation' => $saved->ai_recommendation ?? null,
+                        'ai_model' => $saved->ai_model ?? null,
+
+                        'created_at' => (string)($saved->created_at ?? ''),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                // keep analytics page working even if Gemini fails
+                $aiRiskAssessments = [];
+            }
+        }
+
+        // ====================== END GEMINI EXPLANATION + SAVE ======================
+
         return Inertia::render('Reviewer/Analytics', [
             'filters' => [
                 'timeframe' => $timeframe,
@@ -242,7 +472,13 @@ class ReviewAnalyticsController extends Controller
                 'worstReports' => $worstReports,
                 'defectItems' => array_slice($defectItems, 0, 60),
                 'inconsistentItems' => array_slice($inconsistentItems, 0, 25),
+
+                'riskScores' => $riskReports, // includes ai_explanation now
             ],
+
+            // ✅ ADD ONLY: THIS is what your TSX is using (aiByReportId Map)
+            'aiRiskAssessments' => $aiRiskAssessments,
+
             'ai' => $ai,
         ]);
     }

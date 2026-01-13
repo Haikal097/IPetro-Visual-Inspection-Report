@@ -751,7 +751,7 @@ export default function ShowReview({ report }: { report: any }) {
                 onClick={() => setOpenAiReview(true)}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
               >
-                AI Review Assistant
+                AI Review Summary
               </button>
 
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">

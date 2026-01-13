@@ -54,7 +54,7 @@ export default function ReportReviewModal({ open, onClose, report }: Props) {
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <div>
                   <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
-                    AI Review Assistant
+                    AI Review Summary
                   </Dialog.Title>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Completeness & consistency analysis of this report

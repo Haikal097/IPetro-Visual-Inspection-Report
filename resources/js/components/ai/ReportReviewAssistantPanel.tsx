@@ -361,7 +361,7 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                AI Review Assistant
+                AI Review Summary
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Completeness + consistency checks + suggested reviewer comments (you decide)
@@ -405,13 +405,15 @@ export default function ReportReviewAssistantPanel({ report }: Props) {
               )}
             </span>
 
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${actionBadge(
-                (res as any).suggestedAction
-              )}`}
-            >
-              Suggested: {(res as any).suggestedAction ?? "revision_requested"}
-            </span>
+            {false && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${actionBadge(
+                  (res as any).suggestedAction
+                )}`}
+              >
+                Suggested: {(res as any).suggestedAction ?? "revision_requested"}
+              </span>
+            )}
           </div>
 
           {(res as any).reportSummary && (
