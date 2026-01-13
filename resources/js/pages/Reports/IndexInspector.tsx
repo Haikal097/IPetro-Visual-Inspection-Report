@@ -560,7 +560,7 @@ export default function Report({
                   }`}
                 >
                   <Upload className="h-4 w-4" />
-                  InReview
+                  In Review
                   <span className="ml-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
                     {counts.in_review}
                   </span>
@@ -646,7 +646,7 @@ export default function Report({
                       <div className="flex items-center gap-2 mb-3">
                         <HardHat className="h-4 w-4 text-gray-400" />
                         <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {report.equipmentType ?? '-'} • {report.equipmentTag ?? '-'}
+                          {report.equipment ?? '-'} • {report.equipmentTag ?? '-'}
                         </span>
                       </div>
 
@@ -692,11 +692,20 @@ export default function Report({
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                           <Calendar className="h-3.5 w-3.5" />
-                          <span>Due: {report.dueDate ?? '-'}</span>
+                          <span>
+                            Date: {report.createdAt 
+                              ? new Date(report.createdAt).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                })
+                              : '-'
+                            }
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                           <Clock className="h-3.5 w-3.5" />
-                          <span>{(report as any).updated_at}</span>
+                          <span>{report.lastUpdated ?? '—'}</span>
                         </div>
                       </div>
                     </div>
@@ -790,7 +799,7 @@ export default function Report({
                                 <div className="flex items-center gap-1">
                                   <HardHat className="h-3.5 w-3.5" />
                                   <span>
-                                    {report.equipmentType ?? '-'} • {report.equipmentTag ?? '-'}
+                                    {report.equipment ?? '-'} • {report.equipmentTag ?? '-'}
                                   </span>
                                 </div>
 
@@ -839,8 +848,16 @@ export default function Report({
 
                         <td className="px-6 py-4">
                           <div className="space-y-1">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{report.createdAt ?? '—'}</div>
-
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {report.createdAt 
+                              ? new Date(report.createdAt).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric'
+                                  })
+                                : '—'
+                              }
+                            </div>
                             <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                               <Clock className="h-3 w-3" />
                               Updated {report.lastUpdated ?? '—'}

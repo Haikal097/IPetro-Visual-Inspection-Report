@@ -65,11 +65,22 @@ function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-function makeReportNumber(): string {
-  const year = new Date().getFullYear();
-  const randomID = Math.floor(1000 + Math.random() * 9000);
-  return `RPT-${year}-${randomID}`;
-}
+  function makeReportNumber(mainReportData?: any): string {
+    // If mainReportData is provided and has reportNo, use it
+    if (mainReportData?.reportNo) {
+      return mainReportData.reportNo;
+    }
+    
+    // If we're creating a new photo report but have report_data from backend
+    if (mainReportData?.report_data?.reportNo) {
+      return mainReportData.report_data.reportNo;
+    }
+    
+    // Fallback: Use the current year with random ID
+    const year = new Date().getFullYear();
+    const randomID = Math.floor(1000 + Math.random() * 9000);
+    return `RPT-${year}-${randomID}`;
+  }
 
 function ensureShape(input: any): ReportData | null {
   if (!input || typeof input !== "object") return null;
@@ -332,7 +343,6 @@ export default function PhotoReport() {
                   if (restored) {
                     setData(restored);
                     setIsLoading(false);
-                    alert(`✅ Loaded photo report from database (ID: ${photoReport.id})`);
                     return;
                   }
                 }
@@ -342,9 +352,7 @@ export default function PhotoReport() {
                   reportTitle: photoReport.report_title || 
                             mainReportData?.title || 
                             "VISUAL INTERNAL INSPECTION",
-                  reportNumber: photoReport.report_number || 
-                              mainReportData?.reportNo || 
-                              makeReportNumber(),
+                  reportNumber: makeReportNumber(mainReportData || response.data.data),
                   inspectionDate: photoReport.inspection_date || 
                                 mainReportData?.reportDate || 
                                 todayISO(),
@@ -373,9 +381,7 @@ export default function PhotoReport() {
                 };
                 
                 setData(initData);
-                
-                alert(`📝 Created new photo report template from database record (ID: ${photoReport.id})`);
-                
+                                
                 // Save the populated data back to the database
                 saveToBackend(initData, photoReport.id);
                 
@@ -411,7 +417,6 @@ export default function PhotoReport() {
               };
               
               setData(initData);
-              alert('🆕 Creating new photo report (none exists in database)');
               
               // Auto-save the new photo report
               setTimeout(() => {
@@ -421,21 +426,18 @@ export default function PhotoReport() {
               setIsLoading(false);
               return;
             } else {
-              alert('❌ Failed to connect to database. Please check your connection.');
               setIsLoading(false);
               return;
             }
           }
         } catch (error) {
           console.error('Backend load failed:', error);
-          alert('❌ Failed to load data. Please try again.');
           setIsLoading(false);
           return;
         }
         
       } catch (error) {
         console.error('Failed to load report:', error);
-        alert('❌ Error loading report data. Please refresh.');
         setIsLoading(false);
       }
     };
@@ -501,7 +503,6 @@ export default function PhotoReport() {
       return true;
     } catch (err: any) {
       console.error("❌ Save failed:", err.response?.data || err.message);
-      alert("❌ Failed to save photo report. Check console/network.");
       return false;
     } finally {
       setIsSaving(false);
@@ -511,7 +512,6 @@ export default function PhotoReport() {
   const handleSaveToDB = async () => {
     if (!data) return;
     const ok = await saveToBackend(data, photoReportId || undefined);
-    if (ok) alert("✅ Photo report saved to database!");
   };
 
 
@@ -600,7 +600,6 @@ export default function PhotoReport() {
 
   const handleSubmitReport = async () => {
     if (!data || !reportId) {
-      alert("No data to submit or report ID missing.");
       return;
     }
 
@@ -656,7 +655,6 @@ export default function PhotoReport() {
           setIsReadOnly(true);
         }
 
-        alert("✅ Photo report submitted successfully! The main report status has been updated to 'submitted'.");
         
       } else {
         alert("❌ Failed to submit: " + (response.data.message || "Unknown error"));
