@@ -7,19 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class Inspection extends Model
 {
     protected $fillable = [
-        'user_id',
-        'title',
-        'tag',
-        'location',
-        'notes',
-        'start_at',
-        'end_at',
-        'status',
-        'remind_1d',
-        'remind_1h',
-        'reminded_1d_at',
-        'reminded_1h_at',
-    ];
+  'user_id', // keep for backward compatibility
+  'assigned_to',
+  'created_by',
+  'title','tag','location','notes',
+  'start_at','end_at','status',
+  'remind_1d','remind_1h','reminded_1d_at','reminded_1h_at',
+  'overdue_notified_at',
+];
+
 
     protected $casts = [
         'start_at' => 'datetime',

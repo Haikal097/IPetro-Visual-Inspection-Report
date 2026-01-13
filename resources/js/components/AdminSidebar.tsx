@@ -12,7 +12,8 @@ import {
   Target,
   Database,
   Key,
-  Cpu
+  Cpu,
+  Calendar // ✅ ADDED
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -23,6 +24,9 @@ export default function AdminSidebar({ currentPath }: AdminSidebarProps) {
   const navItems = [
     /*{ href: '/admin', icon: Home, label: 'Dashboard' },*/
     { href: '/admin/users', icon: Users, label: 'User Management' },
+
+    // ✅ ADDED: Admin Scheduler
+    { href: '/admin/inspection-scheduler', icon: Calendar, label: 'Inspection Scheduler' },
   ];
 
   /*
@@ -31,8 +35,6 @@ export default function AdminSidebar({ currentPath }: AdminSidebarProps) {
     { href: '/admin/assets', icon: Factory, label: 'Assets' },
     { href: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
     { href: '/admin/settings', icon: Settings, label: 'Settings' }, 
-
-    
 
   const systemItems = [
     { href: '/admin/audit', icon: Database, label: 'Audit Logs' },
@@ -106,7 +108,7 @@ export default function AdminSidebar({ currentPath }: AdminSidebarProps) {
                 <span className="font-medium">{item.label}</span>
               </Link>
             );
-          })}
+          })} 
         </nav>*/}
       </div>
 
