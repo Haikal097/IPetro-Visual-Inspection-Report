@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   FileText, 
   CheckCircle, 
@@ -37,6 +37,20 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/review/rejected',
     },
 ];
+
+interface Pagination {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  from: number;
+  to: number;
+  links: Array<{
+    url: string | null;
+    label: string;
+    active: boolean;
+  }>;
+}
 
 interface DatabaseReviewItem {
     id: number;
@@ -102,17 +116,41 @@ interface Props {
         status?: string;
         timeframe?: string;
     };
+    pagination?: Pagination;
 }
 
-export default function RejectedReports({ reviews, stats, filters }: Props) {
+export default function RejectedReports({ reviews, stats, filters, pagination }: Props) {
     console.log('Raw reviews data from props:', reviews);
     console.log('Total reviews fetched:', reviews.length);
+
+    //PAGINATION STATE
+    const [currentPage, setCurrentPage] = useState(pagination?.current_page || 1);
+    const [perPage, setPerPage] = useState(pagination?.per_page || 15);
 
     const [searchQuery, setSearchQuery] = useState(filters?.search || '');
     const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>(
         (filters?.timeframe as any) || 'all'
     );
-    
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            if (searchQuery !== (filters?.search || '')) {
+                setCurrentPage(1);
+                router.get('/review/rejected', {
+                    search: searchQuery || undefined,
+                    timeframe: timeFilter !== 'all' ? timeFilter : undefined,
+                    page: 1,
+                    per_page: perPage,
+                }, {
+                    preserveScroll: true,
+                    preserveState: true,
+                });
+            }
+        }, 500);
+
+        return () => clearTimeout(handler);
+    }, [searchQuery, timeFilter, perPage]);
+        
     // Transform database data to match component interface
     const transformDatabaseData = (dbReviews: DatabaseReviewItem[]): ReviewItem[] => {
         return dbReviews.map(item => {
@@ -252,13 +290,58 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
             setTimeFilter(value as any);
         }
         
-        // Optional: Make an Inertia visit to reload with filters
-        // router.get('/review/rejected', { [filterType]: value !== 'all' ? value : undefined }, { preserveState: true });
+        setCurrentPage(1);
+        
+        router.get('/review/rejected', {
+            timeframe: value !== 'all' ? value : undefined,
+            search: searchQuery || undefined,
+            page: 1,
+            per_page: perPage,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+    const handlePageChange = (page: number) => {
+        if (page < 1 || page > (pagination?.last_page || 1)) return;
+        
+        setCurrentPage(page);
+        router.get('/review/rejected', {
+            search: searchQuery || undefined,
+            timeframe: timeFilter !== 'all' ? timeFilter : undefined,
+            page,
+            per_page: perPage,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
+
+    const handlePerPageChange = (value: number) => {
+        setPerPage(value);
+        setCurrentPage(1);
+        router.get('/review/rejected', {
+            search: searchQuery || undefined,
+            timeframe: timeFilter !== 'all' ? timeFilter : undefined,
+            page: 1,
+            per_page: value,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
 
     // Handle refresh
     const handleRefresh = () => {
-        router.reload({ only: ['reviews', 'stats'] });
+        router.get('/review/rejected', {
+            search: searchQuery || undefined,
+            timeframe: timeFilter !== 'all' ? timeFilter : undefined,
+            page: currentPage,
+            per_page: perPage,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
 
     /* Handle restore/review again action (UNUSED)
@@ -382,11 +465,23 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
                                                         <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                                                             <div className="flex items-center gap-1">
                                                                 <Calendar className="h-3.5 w-3.5" />
-                                                                <span>Inspection: {item.inspectionDate}</span>
+                                                                <span>
+                                                                    Inspection: {new Date(item.inspectionDate).toLocaleDateString('en-GB', {
+                                                                        day: '2-digit',
+                                                                        month: '2-digit',
+                                                                        year: 'numeric'
+                                                                    })}
+                                                                </span>
                                                             </div>
                                                             <div className="flex items-center gap-1">
                                                                 <Clock className="h-3.5 w-3.5" />
-                                                                <span>Submitted: {item.submittedDate}</span>
+                                                                <span>
+                                                                    Submitted: {new Date(item.submittedDate).toLocaleDateString('en-GB', {
+                                                                        day: '2-digit',
+                                                                        month: '2-digit',
+                                                                        year: 'numeric'
+                                                                    })}
+                                                                </span>
                                                             </div>
                                                             {item.pmt && (
                                                                 <div className="flex items-center gap-1">
@@ -465,13 +560,115 @@ export default function RejectedReports({ reviews, stats, filters }: Props) {
                                 </div>
                             )}
                         </div>
+                        {/* Pagination Component */}
+                        {pagination && (
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    Showing <span className="font-semibold">{pagination.from}</span> to{' '}
+                                    <span className="font-semibold">{pagination.to}</span> of{' '}
+                                    <span className="font-semibold">{pagination.total}</span> rejected reports
+                                </div>
+                                
+                                <div className="flex items-center gap-4">
+                                    {/* Items per page selector */}
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-sm text-gray-600 dark:text-gray-400">Show:</label>
+                                        <select
+                                            value={perPage}
+                                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                                            className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/20 dark:text-white"
+                                        >
+                                            <option value="10">10</option>
+                                            <option value="15">15</option>
+                                            <option value="25">25</option>
+                                            <option value="50">50</option>
+                                        </select>
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">per page</span>
+                                    </div>
+                                    
+                                    {/* Pagination buttons */}
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => handlePageChange(currentPage - 1)}
+                                            disabled={currentPage === 1}
+                                            className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                        >
+                                            <span className="sr-only">Previous</span>
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        
+                                        {/* Page numbers */}
+                                        {pagination.links.slice(1, -1).map((link, index) => {
+                                            // Only show a limited number of page numbers
+                                            const pageNum = parseInt(link.label);
+                                            const totalPages = pagination.last_page;
+                                            
+                                            // Show first, last, current, and nearby pages
+                                            if (
+                                                pageNum === 1 ||
+                                                pageNum === totalPages ||
+                                                (pageNum >= currentPage - 2 && pageNum <= currentPage + 2) ||
+                                                (currentPage <= 3 && pageNum <= 5) ||
+                                                (currentPage >= totalPages - 2 && pageNum >= totalPages - 4)
+                                            ) {
+                                                return (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => handlePageChange(pageNum)}
+                                                        className={`inline-flex items-center justify-center h-9 min-w-9 px-2 rounded-lg border transition-colors ${
+                                                            link.active
+                                                                ? 'bg-rose-600 border-rose-600 text-white'
+                                                                : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                        }`}
+                                                    >
+                                                        {link.label}
+                                                    </button>
+                                                );
+                                            }
+                                            
+                                            // Add ellipsis for skipped pages
+                                            if (
+                                                (pageNum === currentPage - 3 && currentPage > 4) ||
+                                                (pageNum === currentPage + 3 && currentPage < totalPages - 3)
+                                            ) {
+                                                return (
+                                                    <span key={index} className="h-9 px-2 flex items-center justify-center text-gray-500">
+                                                        ...
+                                                    </span>
+                                                );
+                                            }
+                                            
+                                            return null;
+                                        })}
+                                        
+                                        <button
+                                            onClick={() => handlePageChange(currentPage + 1)}
+                                            disabled={currentPage === pagination.last_page}
+                                            className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                        >
+                                            <span className="sr-only">Next</span>
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Bottom Actions & Summary */}
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Showing {filteredReviews.length} of {rejectedReviewItems.length} rejected reports
+                        Showing {filteredReviews.length} rejected reports on this page
+                        {pagination && (
+                            <span className="ml-2">
+                                (Page {pagination.current_page} of {pagination.last_page})
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>

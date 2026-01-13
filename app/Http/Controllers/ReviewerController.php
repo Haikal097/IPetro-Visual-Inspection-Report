@@ -192,7 +192,11 @@ class ReviewerController extends Controller
         $query->orderBy('updated_at', 'desc')
             ->orderBy('created_at', 'desc');
 
-        $reports = $query->get()->map(function ($report) {
+        // ✅ ADD PAGINATION: Get paginated results
+        $perPage = $request->per_page ?? 15;
+        $reports = $query->paginate($perPage);
+
+        $mappedReports = $reports->map(function ($report) {
             $jsonData = [];
             if ($report->json_data) {
                 try {
@@ -282,32 +286,42 @@ class ReviewerController extends Controller
                 'creator_id' => $report->creator_id,
                 'inspector_id' => $report->inspector_id,
             ];
-    });
+        });
 
-    // Get stats for approved reports
-    $totalApproved = $reports->count();
-    $approvedToday = Report::whereDate('updated_at', today())
-        ->where('status', 'approved')
-        ->count();
+        // Get stats for approved reports
+        $totalApproved = $reports->total(); // ✅ Use total() from paginator
+        $approvedToday = Report::whereDate('updated_at', today())
+            ->where('status', 'approved')
+            ->count();
 
-    // Calculate approval rate for approved reports page (optional)
-    $totalReports = Report::count();
-    $approvalRate = $totalReports > 0 ? round(($totalApproved / $totalReports) * 100, 1) : 0;
+        // Calculate approval rate for approved reports page (optional)
+        $totalReports = Report::count();
+        $approvalRate = $totalReports > 0 ? round(($totalApproved / $totalReports) * 100, 1) : 0;
 
-    return Inertia::render('Reviewer/ApprovedReport', [
-        'reviews' => $reports,
-        'stats' => [
-            'total_pending' => 0,
-            'in_review' => 0,
-            'revisions_needed' => 0,
-            'completed_today' => $approvedToday,
-            'avg_review_time' => '0h',
-            'approval_rate' => $approvalRate . '%',
-            'overdue_reviews' => 0,
-            'total_reviews' => $totalApproved,
-        ],
-        'filters' => $request->only(['search', 'status', 'timeframe']),
-    ]);
+        return Inertia::render('Reviewer/ApprovedReport', [
+            'reviews' => $mappedReports,
+            // ✅ ADD PAGINATION DATA
+            'pagination' => [
+                'current_page' => $reports->currentPage(),
+                'per_page' => $reports->perPage(),
+                'total' => $reports->total(),
+                'last_page' => $reports->lastPage(),
+                'from' => $reports->firstItem(),
+                'to' => $reports->lastItem(),
+                'links' => $reports->linkCollection()->toArray(),
+            ],
+            'stats' => [
+                'total_pending' => 0,
+                'in_review' => 0,
+                'revisions_needed' => 0,
+                'completed_today' => $approvedToday,
+                'avg_review_time' => '0h',
+                'approval_rate' => $approvalRate . '%',
+                'overdue_reviews' => 0,
+                'total_reviews' => $totalApproved,
+            ],
+            'filters' => $request->only(['search', 'status', 'timeframe']),
+        ]);
     }
 
     public function rejectedPage(Request $request)
@@ -320,7 +334,11 @@ class ReviewerController extends Controller
         $query->orderBy('updated_at', 'desc')
             ->orderBy('created_at', 'desc');
 
-        $reports = $query->get()->map(function ($report) {
+        // ✅ ADD PAGINATION: Get paginated results
+        $perPage = $request->per_page ?? 15;
+        $reports = $query->paginate($perPage);
+
+        $mappedReports = $reports->map(function ($report) {
             $jsonData = [];
             if ($report->json_data) {
                 try {
@@ -413,13 +431,23 @@ class ReviewerController extends Controller
         });
 
         // Get stats for rejected reports
-        $totalRejected = $reports->count();
+        $totalRejected = $reports->total(); // ✅ Use total() from paginator
         $rejectedToday = Report::whereDate('updated_at', today())
             ->where('status', 'rejected')
             ->count();
 
         return Inertia::render('Reviewer/RejectedReport', [
-            'reviews' => $reports,
+            'reviews' => $mappedReports,
+            // ✅ ADD PAGINATION DATA
+            'pagination' => [
+                'current_page' => $reports->currentPage(),
+                'per_page' => $reports->perPage(),
+                'total' => $reports->total(),
+                'last_page' => $reports->lastPage(),
+                'from' => $reports->firstItem(),
+                'to' => $reports->lastItem(),
+                'links' => $reports->linkCollection()->toArray(),
+            ],
             'stats' => [
                 'total_pending' => 0,
                 'in_review' => 0,
