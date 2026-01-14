@@ -28,8 +28,6 @@ class ReportApproved extends Notification
             'title' => $this->report->title,
             'status' => $this->report->status,
             'message' => 'Your report has been approved.',
-            'actor_id' => $this->actor?->id,
-            'actor_name' => $this->actor?->name,
             'url' => "/pv-report/{$this->report->getKey()}",
             'created_at' => now()->toDateTimeString(),
         ];
