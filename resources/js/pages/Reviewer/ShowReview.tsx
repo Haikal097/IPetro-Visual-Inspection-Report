@@ -72,7 +72,6 @@ const handlePrintPhotoReport = () => {
         // Find the most recent relevant log
         for (const log of report.review_logs) {
             // Look for approval, rejection, or revision request
-            // ✅ DATE IS REQUIRED, MESSAGE IS OPTIONAL
             if (['approved', 'rejected', 'revisions_requested'].includes(log.action)) {
                 // ✅ ALWAYS get the approval date (created_at is required)
                 approvalDate = log.created_at;
@@ -90,6 +89,8 @@ const handlePrintPhotoReport = () => {
         title: report.title,
         reportNo: rd.reportNo || report.report_number,
         reportDate: rd.reportDate || report.created_at,
+
+        reportStatus: report.status,
 
         equipmentTag: rd.equipmentTag,
         equipmentDescription: rd.equipmentDescription,

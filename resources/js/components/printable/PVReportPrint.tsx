@@ -15,6 +15,8 @@ type PrintData = {
   reportDate?: string;
   title?: string;
 
+  reportStatus?: string;
+
   equipmentTag?: string;
   equipmentDescription?: string;
   equipmentType?: string;
@@ -661,80 +663,107 @@ export default function PVReportPrint({
           marginTop: '30px'
         }}>
         
-        {/* Signatures & Approvals (your exact block) */}
-        <div style={{ marginTop: "30px" }}>
-          <h3 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0 0 20px 0", paddingBottom: "5px", borderBottom: "1px solid #000" }}>
-            APPROVAL & VERIFICATION
-          </h3>
+        {/* APPROVAL & VERIFICATION Section - Only show if report is approved */}
+        {data.reportStatus === 'approved' ? (
+          <div style={{ 
+            pageBreakBefore: 'always',
+            marginTop: '30px'
+          }}>
+            <div style={{ marginTop: "30px" }}>
+              <h3 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0 0 20px 0", paddingBottom: "5px", borderBottom: "1px solid #000" }}>
+                APPROVAL & VERIFICATION
+              </h3>
 
-          <div style={{ marginBottom: "30px" }}>
-            <h4 style={{ fontSize: "11pt", fontWeight: "bold", margin: "0 0 15px 0", color: "#333" }}>
-              Recommendation / Comment by DOSH Officer (if applicable):
-            </h4>
+              <div style={{ marginBottom: "30px" }}>
+                <h4 style={{ fontSize: "11pt", fontWeight: "bold", margin: "0 0 15px 0", color: "#333" }}>
+                  Recommendation / Comment by DOSH Officer (if applicable):
+                </h4>
 
-            {/* Updated: Display DOSH comment from review logs */}
-            <div style={{ 
-              marginBottom: "20px", 
-              padding: "15px", 
-              border: "1px solid #ddd", 
-              backgroundColor: "#f9f9f9", 
-              borderRadius: "4px", 
-              minHeight: "80px",
-              whiteSpace: "pre-wrap", // Preserve line breaks
-              fontSize: "10pt",
-              lineHeight: "1.4"
-            }}>
-              {data.doshComment ? (
-                data.doshComment
-              ) : (
-                <span style={{ color: "#999", fontStyle: "italic" }}>
-                  No comment provided by DOSH officer
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                  {data.reviewerName || ""}
+                {/* Updated: Display DOSH comment from review logs */}
+                <div style={{ 
+                  marginBottom: "20px", 
+                  padding: "15px", 
+                  border: "1px solid #ddd", 
+                  backgroundColor: "#f9f9f9", 
+                  borderRadius: "4px", 
+                  minHeight: "80px",
+                  whiteSpace: "pre-wrap", // Preserve line breaks
+                  fontSize: "10pt",
+                  lineHeight: "1.4"
+                }}>
+                  {data.doshComment ? (
+                    data.doshComment
+                  ) : (
+                    <span style={{ color: "#999", fontStyle: "italic" }}>
+                      No comment provided by DOSH officer
+                    </span>
+                  )}
                 </div>
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
-              </div>
-              <div>
-                <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
-                <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                  {data.reviewerSignatureUrl ? (
-                    <img 
-                      src={data.reviewerSignatureUrl} 
-                      style={{ height: "30px", objectFit: "contain" }} 
-                      alt="Reviewer Signature" 
-                    />
-                  ) : null}
-                </div>
-                <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
-              </div>
-                <div>
-                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                    {/* ✅ Use approval date from review log if available, otherwise current date */}
-                    {data.approvalDate ? (
-                      formatDate(data.approvalDate)
-                    ) : (
-                      (() => {
-                        const today = new Date();
-                        const day = String(today.getDate()).padStart(2, '0');
-                        const month = String(today.getMonth() + 1).padStart(2, '0');
-                        const year = today.getFullYear();
-                        return `${day}/${month}/${year}`;
-                      })()
-                    )}
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
+                  <div>
+                    <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
+                    <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                      {data.reviewerName || ""}
+                    </div>
+                    <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
                   </div>
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                  <div>
+                    <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
+                    <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                      {data.reviewerSignatureUrl ? (
+                        <img 
+                          src={data.reviewerSignatureUrl} 
+                          style={{ height: "30px", objectFit: "contain" }} 
+                          alt="Reviewer Signature" 
+                        />
+                      ) : null}
+                    </div>
+                    <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
+                  </div>
+                    <div>
+                      <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
+                      <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                        {/* ✅ Use approval date from review log if available, otherwise current date */}
+                        {data.approvalDate ? (
+                          formatDate(data.approvalDate)
+                        ) : (
+                          (() => {
+                            const today = new Date();
+                            const day = String(today.getDate()).padStart(2, '0');
+                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                            const year = today.getFullYear();
+                            return `${day}/${month}/${year}`;
+                          })()
+                        )}
+                      </div>
+                      <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                    </div>
                 </div>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Show a note if report is not approved */
+          <div style={{ 
+            pageBreakBefore: 'always',
+            marginTop: '30px',
+            textAlign: 'center',
+            padding: '20px',
+            border: '1px dashed #ccc',
+            backgroundColor: '#f9f9f9'
+          }}>
+            <h3 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0 0 10px 0", color: "#666" }}>
+              APPROVAL & VERIFICATION
+            </h3>
+            <p style={{ fontSize: "10pt", color: "#666" }}>
+              Report status: <strong>{data.reportStatus ? data.reportStatus.toUpperCase() : 'NOT SET'}</strong>
+            </p>
+            <p style={{ fontSize: "9pt", color: "#777", marginTop: "10px" }}>
+              Approval verification is not applicable for this report status.
+            </p>
+          </div>
+        )}
         </div> {/* End of page break wrapper */}
 
 
@@ -872,99 +901,118 @@ export default function PVReportPrint({
         {/* Original Signatures & Approvals Section (for main report) */}
         {items.length === 0 && (
           <div style={{ marginTop: "30px" }}>
-            <h3 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0 0 20px 0", paddingBottom: "5px", borderBottom: "1px solid #000" }}>
-              APPROVAL & VERIFICATION
-            </h3>
+            {data.reportStatus === 'approved' ? (
+              <>
+                <h3 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0 0 20px 0", paddingBottom: "5px", borderBottom: "1px solid #000" }}>
+                  APPROVAL & VERIFICATION
+                </h3>
 
-            <div style={{ marginBottom: "30px" }}>
-              <h4 style={{ fontSize: "11pt", fontWeight: "bold", margin: "0 0 15px 0", color: "#333" }}>
-                Recommendation / Comment by DOSH Officer (if applicable):
-              </h4>
+                <div style={{ marginBottom: "30px" }}>
+                  <h4 style={{ fontSize: "11pt", fontWeight: "bold", margin: "0 0 15px 0", color: "#333" }}>
+                    Recommendation / Comment by DOSH Officer (if applicable):
+                  </h4>
 
-              <div style={{ marginBottom: "20px", padding: "15px", border: "1px solid #ddd", backgroundColor: "#f9f9f9", borderRadius: "4px", minHeight: "80px" }} />
+                  <div style={{ marginBottom: "20px", padding: "15px", border: "1px solid #ddd", backgroundColor: "#f9f9f9", borderRadius: "4px", minHeight: "80px" }} />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
-                <div>
-                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                    {data.reviewerName || ""}
-                  </div>
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                    {data.reviewerSignatureUrl ? (
-                      <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
-                    ) : null}
-                  </div>
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
-                </div>
-                  <div>
-                    <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
-                    <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                      {/* ✅ Use approval date from review log if available, otherwise current date */}
-                      {data.approvalDate ? (
-                        formatDate(data.approvalDate)
-                      ) : (
-                        (() => {
-                          const today = new Date();
-                          const day = String(today.getDate()).padStart(2, '0');
-                          const month = String(today.getMonth() + 1).padStart(2, '0');
-                          const year = today.getFullYear();
-                          return `${day}/${month}/${year}`;
-                        })()
-                      )}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
+                    <div>
+                      <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
+                      <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                        {data.reviewerName || ""}
+                      </div>
+                      <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
                     </div>
-                    <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
-                  </div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: "20px", paddingTop: "20px", borderTop: "1px dashed #ccc" }}>
-              <h4 style={{ fontSize: "11pt", fontWeight: "bold", margin: "0 0 15px 0", color: "#333" }}>
-                Action taken by Plant on recommendation (if applicable):
-              </h4>
-
-              <div style={{ marginBottom: "20px", padding: "15px", border: "1px solid #ddd", backgroundColor: "#f9f9f9", borderRadius: "4px", minHeight: "80px" }} />
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
-                <div>
-                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                    {data.reviewerName || ""}
-                  </div>
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
-                  <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                    {data.reviewerSignatureUrl ? (
-                      <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
-                    ) : null}
-                  </div>
-                  <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
-                </div>
-                  <div>
-                    <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
-                    <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
-                      {/* ✅ Use approval date from review log if available, otherwise current date */}
-                      {data.approvalDate ? (
-                        formatDate(data.approvalDate)
-                      ) : (
-                        (() => {
-                          const today = new Date();
-                          const day = String(today.getDate()).padStart(2, '0');
-                          const month = String(today.getMonth() + 1).padStart(2, '0');
-                          const year = today.getFullYear();
-                          return `${day}/${month}/${year}`;
-                        })()
-                      )}
+                    <div>
+                      <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
+                      <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                        {data.reviewerSignatureUrl ? (
+                          <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
+                        ) : null}
+                      </div>
+                      <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
                     </div>
-                    <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                      <div>
+                        <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
+                        <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                          {/* ✅ Use approval date from review log if available, otherwise current date */}
+                          {data.approvalDate ? (
+                            formatDate(data.approvalDate)
+                          ) : (
+                            (() => {
+                              const today = new Date();
+                              const day = String(today.getDate()).padStart(2, '0');
+                              const month = String(today.getMonth() + 1).padStart(2, '0');
+                              const year = today.getFullYear();
+                              return `${day}/${month}/${year}`;
+                            })()
+                          )}
+                        </div>
+                        <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                      </div>
                   </div>
-              </div>
+                </div>
+
+                {/* Action taken by Plant section (optional) */}
+                <div style={{ marginBottom: "20px", paddingTop: "20px", borderTop: "1px dashed #ccc" }}>
+                  <h4 style={{ fontSize: "11pt", fontWeight: "bold", margin: "0 0 15px 0", color: "#333" }}>
+                    Action taken by Plant on recommendation (if applicable):
+                  </h4>
+
+                  <div style={{ marginBottom: "20px", padding: "15px", border: "1px solid #ddd", backgroundColor: "#f9f9f9", borderRadius: "4px", minHeight: "80px" }} />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "25px" }}>
+                    <div>
+                      <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Name</p>
+                      <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                        {data.reviewerName || ""}
+                      </div>
+                      <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Name</p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Signature</p>
+                      <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                        {data.reviewerSignatureUrl ? (
+                          <img src={data.reviewerSignatureUrl} style={{ height: "30px", objectFit: "contain" }} alt="Reviewer Signature" />
+                        ) : null}
+                      </div>
+                      <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>Reviewer Signature</p>
+                    </div>
+                      <div>
+                        <p style={{ fontSize: "9pt", fontWeight: "600", margin: "0 0 8px 0", color: "#555" }}>Date</p>
+                        <div style={{ borderBottom: "1px solid #000", padding: "8px 0 4px 0", minHeight: "20px" }}>
+                          {/* ✅ Use approval date from review log if available, otherwise current date */}
+                          {data.approvalDate ? (
+                            formatDate(data.approvalDate)
+                          ) : (
+                            (() => {
+                              const today = new Date();
+                              const day = String(today.getDate()).padStart(2, '0');
+                              const month = String(today.getMonth() + 1).padStart(2, '0');
+                              const year = today.getFullYear();
+                              return `${day}/${month}/${year}`;
+                            })()
+                          )}
+                        </div>
+                        <p style={{ fontSize: "8pt", margin: "4px 0 0 0", color: "#777" }}>dd/mm/yyyy</p>
+                      </div>
+                  </div>
+                </div>
+              </>
+          ) : (
+            <div style={{ 
+              textAlign: 'center',
+              padding: '20px',
+              border: '1px dashed #ccc',
+              backgroundColor: '#f9f9f9'
+            }}>
+              <h3 style={{ fontSize: "12pt", fontWeight: "bold", margin: "0 0 10px 0", color: "#666" }}>
+                APPROVAL & VERIFICATION
+              </h3>
+              <p style={{ fontSize: "10pt", color: "#666" }}>
+                Report status: <strong>{data.reportStatus ? data.reportStatus.toUpperCase() : 'NOT SET'}</strong>
+              </p>
             </div>
+          )}
           </div>
         )}
       </div>
