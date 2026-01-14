@@ -60,53 +60,88 @@ export default function ShowReview({ report }: { report: any }) {
     }
   };
 
-  const handlePrintPhotoReport = () => {
-      const rd = report.report_data || {};
-      const firstPhotoReport = report.photo_reports?.[0] ?? null;
+const handlePrintPhotoReport = () => {
+    const rd = report.report_data || {};
+    const firstPhotoReport = report.photo_reports?.[0] ?? null;
 
-      const printData = {
-          title: report.title,
-          reportNo: rd.reportNo || report.report_number,
-          reportDate: rd.reportDate || report.created_at,
+    // ✅ Get the DOSH officer comment and approval date from review logs
+    let doshComment = null;
+    let approvalDate = null;
+    
+    if (report.review_logs && report.review_logs.length > 0) {
+        // Find the most recent relevant log
+        for (const log of report.review_logs) {
+            // Look for approval, rejection, or revision request
+            // ✅ DATE IS REQUIRED, MESSAGE IS OPTIONAL
+            if (['approved', 'rejected', 'revisions_requested'].includes(log.action)) {
+                // ✅ ALWAYS get the approval date (created_at is required)
+                approvalDate = log.created_at;
+                
+                // ✅ Get message only if it exists (optional)
+                if (log.message) {
+                    doshComment = log.message;
+                }
+                break; // Take the most recent one
+            }
+        }
+    }
 
-          equipmentTag: rd.equipmentTag,
-          equipmentDescription: rd.equipmentDescription,
-          equipmentType: rd.equipmentType,
-          plantUnitArea: rd.plantUnitArea,
-          doshRegistration: rd.doshRegistration,
+    const printData = {
+        title: report.title,
+        reportNo: rd.reportNo || report.report_number,
+        reportDate: rd.reportDate || report.created_at,
 
-          initialFinding: rd.initialFinding,
-          externalFinding: rd.externalFinding,
-          internalFinding: rd.internalFinding,
+        equipmentTag: rd.equipmentTag,
+        equipmentDescription: rd.equipmentDescription,
+        equipmentType: rd.equipmentType,
+        plantUnitArea: rd.plantUnitArea,
+        doshRegistration: rd.doshRegistration,
 
-          ndt: rd.ndt,
-          recommendations: rd.recommendations,
+        initialFinding: rd.initialFinding,
+        externalFinding: rd.externalFinding,
+        internalFinding: rd.internalFinding,
 
-          inspectorName: rd.inspectorName || report.creator?.name,
-          publishDate: rd.publishDate,
+        ndt: rd.ndt,
+        recommendations: rd.recommendations,
 
-          // ✅ Inspector signature (report creator)
-          inspectorSignatureUrl: report.inspector_signature_url || null,
-          
-          // ✅ Reviewer signature (current user - for approval section)
-          reviewerSignatureUrl: report.reviewer_signature_url || null,
-          
-          reviewerName: user?.name || null, // Current user name
+        inspectorName: rd.inspectorName || report.creator?.name,
+        publishDate: rd.publishDate,
 
-          photoReport: firstPhotoReport,
+        // ✅ Inspector signature (report creator)
+        inspectorSignatureUrl: report.inspector_signature_url || null,
+        
+        // ✅ Reviewer signature (current user - for approval section)
+        reviewerSignatureUrl: report.reviewer_signature_url || null,
+        
+        reviewerName: user?.name || null, // Current user name
+        
+        // ✅ Add the extracted DOSH comment (optional) and approval date (required)
+        doshComment: doshComment,
+        approvalDate: approvalDate, // ✅ This is now required
+        
+        // ✅ Optional: pass all review logs if needed for debugging
+        reviewLogs: report.review_logs || [],
 
-          items: report.photo_report_items?.map((item: any) => ({
-              id: item.id,
-              title: item.title,
-              findings: item.findings,
-              requirements: item.requirements,
-              image: item.image,
-          })) || [],
-      };
+        photoReport: firstPhotoReport,
 
-      setPrintData(printData);
-      setShowPrintPreview(true);
-  };
+        items: report.photo_report_items?.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            findings: item.findings,
+            requirements: item.requirements,
+            image: item.image,
+        })) || [],
+    };
+
+    // Debug log to verify
+    console.log("=== DEBUG: Print Data Ready ===");
+    console.log("Approval Date:", printData.approvalDate);
+    console.log("DOSH Comment:", printData.doshComment);
+    console.log("Has approval date?", !!printData.approvalDate);
+
+    setPrintData(printData);
+    setShowPrintPreview(true);
+};
 
   // Helper function to download images one by one (fallback)
 const downloadImagesIndividually = (items: any[]) => {
