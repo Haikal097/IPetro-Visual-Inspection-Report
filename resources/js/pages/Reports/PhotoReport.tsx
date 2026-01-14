@@ -567,8 +567,8 @@ export default function PhotoReport() {
     saveData({ ...data, items: renumbered });
   };
 
-
-  useEffect(() => {
+useEffect(() => {
+  const handlePhotoSelection = async () => {
     if (!data) return;
 
     const params = new URLSearchParams(window.location.search);
@@ -578,25 +578,68 @@ export default function PhotoReport() {
     if (!itemId || !image) return;
 
     const id = Number(itemId);
+    console.log('📸 Processing photo for item', id, image);
 
-    const nextItems = data.items.map((it) =>
-      it.id === id ? { ...it, image } : it
+    // ✅ Update local state immediately so user sees the change
+    const updatedItems = data.items.map(item =>
+      item.id === id ? { ...item, image } : item
     );
+    
+    const updatedData = { ...data, items: updatedItems };
+    setData(updatedData);
 
-    const nextData = { ...data, items: nextItems };
-    setData(nextData);
-
-    // ✅ save immediately (so image goes into DB)
-    if (reportId) {
-      saveToBackend(nextData, photoReportId || undefined);
-    }
-
-    // ✅ clean URL
+    // ✅ Clean the URL immediately (remove photo params)
     params.delete("itemId");
     params.delete("image");
-    const clean = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-    window.history.replaceState({}, "", clean);
-  }, [data, reportId, photoReportId]);
+    const cleanUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+    window.history.replaceState({}, "", cleanUrl);
+
+    // ✅ Save to backend WITHOUT using debounced saveData
+    if (reportId) {
+      setIsSaving(true);
+      try {
+        const savePayload = {
+          report_data: updatedData,
+          report_title: updatedData.reportTitle,
+          report_number: updatedData.reportNumber,
+          inspection_date: updatedData.inspectionDate,
+          pmt: updatedData.pmt,
+          tag: updatedData.tag,
+          description: updatedData.description,
+          plant_unit: updatedData.plantUnit,
+        };
+
+        const endpoint = photoReportId
+          ? `/reports/${reportId}/photo-report`
+          : `/reports/${reportId}/photo-report`;
+
+        const method = photoReportId ? 'put' : 'post';
+
+        const response = await axios({
+          method,
+          url: endpoint,
+          data: savePayload
+        });
+
+        console.log("✅ Photo saved successfully:", response.data);
+
+        // ✅ AFTER successful save, reload the page
+        setTimeout(() => {
+          console.log('🔄 Reloading page to show saved photo...');
+          window.location.reload();
+        }, 800); // Small delay to show success message
+
+      } catch (err: any) {
+        console.error("❌ Failed to save photo:", err.response?.data || err.message);
+        alert('Failed to save photo. Please try again.');
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  handlePhotoSelection();
+}, [data, reportId, photoReportId]); // Dependencies to re-run when data changes
 
   const handleSubmitReport = async () => {
     if (!data || !reportId) {

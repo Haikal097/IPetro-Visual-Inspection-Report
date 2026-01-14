@@ -533,24 +533,26 @@ const downloadImagesAsZip = async (items: any[]) => {
                             )}
                           </p>
                         </div>
+                        {/*
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Inspection Date</p>
                           <p className="font-medium text-gray-900 dark:text-white">
                             {formatDateTime(report.report_data?.inspectionDate)}
                           </p>
-                        </div>
+                        </div>*/}
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Publish Date</p>
                           <p className="font-medium text-gray-900 dark:text-white">
                             {formatDateTime(report.report_data?.publishDate)}
                           </p>
                         </div>
+                        {/*}
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Submission Date</p>
                           <p className="font-medium text-gray-900 dark:text-white">
                             {report.submission_date || 'Not Submitted'}
                           </p>
-                        </div>
+                        </div>*/}
                       </div>
                     </div>
 
