@@ -12,6 +12,9 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -31,6 +34,7 @@ class FortifyServiceProvider extends ServiceProvider
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
+        $this->configureAuthentication();
     }
 
     /**
@@ -88,4 +92,25 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($throttleKey);
         });
     }
+
+    protected function configureAuthentication(): void
+{
+    Fortify::authenticateUsing(function (Request $request) {
+        $user = User::where('email', $request->email)->first();
+
+        // If email/password wrong -> normal fail
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            return null;
+        }
+
+        // ✅ Block inactive users
+        if (($user->status ?? null) === 'inactive') {
+            throw ValidationException::withMessages([
+                'email' => 'Your account is inactive. Please contact the administrator.',
+            ]);
+        }
+
+        return $user;
+    });
+}
 }

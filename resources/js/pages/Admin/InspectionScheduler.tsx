@@ -263,7 +263,7 @@ export default function InspectionScheduler({
     <AdminLayout>
       <Head title="Inspection Scheduler | iPetro" />
 
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4 text-gray-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Inspection Scheduler</h1>
@@ -362,7 +362,7 @@ export default function InspectionScheduler({
       {/* Modal */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl text-gray-900">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">

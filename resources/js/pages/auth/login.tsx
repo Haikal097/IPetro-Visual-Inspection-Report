@@ -298,21 +298,6 @@ export default function Login({
                                             )}
                                         </Form>
 
-                                        {/* Registration Link */}
-                                        {canRegister && (
-                                            <div className="mt-6 pt-6 border-t border-gray-800 text-center">
-                                                <p className="text-gray-400 text-sm">
-                                                    Need access to the system?{' '}
-                                                    <TextLink 
-                                                        href={register()} 
-                                                        className="text-[#CD202C] hover:text-[#B81C26] font-medium"
-                                                    >
-                                                        Request Account
-                                                    </TextLink>
-                                                </p>
-                                            </div>
-                                        )}
-
                                         {/* Support Info */}
                                         <div className="mt-8 p-4 rounded-xl bg-gray-900/50 border border-gray-800">
                                             <div className="flex items-start gap-3">

@@ -1091,38 +1091,6 @@ const ready = Object.values(checklist).every(Boolean);
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Plant Action Section -->
-                        <div style="margin-bottom: 20px; padding-top: 20px; border-top: 1px dashed #ccc;">
-                            <h4 style="font-size: 11pt; font-weight: bold; margin: 0 0 15px 0; color: #333;">
-                                Action taken by Plant on recommendation (if applicable):
-                            </h4>
-                            
-                            <!-- Action Taken Box -->
-                            <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9; border-radius: 4px; min-height: 80px;">
-                                <p style="font-size: 10pt; margin: 0; color: #666; font-style: italic;">
-                                    Describe actions taken by plant management...
-                                </p>
-                            </div>
-                            
-                            <!-- Plant Management Signature -->
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px;">
-                                <div>
-                                    <p style="font-size: 9pt; font-weight: 600; margin: 0 0 8px 0; color: #555;">Name</p>
-                                    <div style="border-bottom: 1px solid #000; padding: 8px 0 4px 0; min-height: 20px;"></div>
-                                    <p style="font-size: 8pt; margin: 4px 0 0 0; color: #777;">Plant Manager Name</p>
-                                </div>
-                                <div>
-                                    <p style="font-size: 9pt; font-weight: 600; margin: 0 0 8px 0; color: #555;">Signature</p>
-                                    <div style="border-bottom: 1px solid #000; padding: 8px 0 4px 0; min-height: 20px;"></div>
-                                    <p style="font-size: 8pt; margin: 4px 0 0 0; color: #777;">Manager Signature</p>
-                                </div>
-                                <div>
-                                    <p style="font-size: 9pt; font-weight: 600; margin: 0 0 8px 0; color: #555;">Date</p>
-                                    <div style="border-bottom: 1px solid #000; padding: 8px 0 4px 0; min-height: 20px;"></div>
-                                    <p style="font-size: 8pt; margin: 4px 0 0 0; color: #777;">dd/mm/yyyy</p>
-                                </div>
-                            </div>                        </div>
                     </div>
 
                     <!-- Footer -->
@@ -2333,39 +2301,6 @@ function PreviewSection({
                                 <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Signature</p>
                                 <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
                                 <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Officer Signature</p>
-                            </div>
-                            <div>
-                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Date</p>
-                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>dd/mm/yyyy</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Plant Action Section */}
-                    <div style={{ marginBottom: '20px', paddingTop: '20px', borderTop: '1px dashed #ccc' }}>
-                        <h4 style={{ fontSize: '11pt', fontWeight: 'bold', margin: '0 0 15px 0', color: '#333' }}>
-                            Action taken by Plant on recommendation (if applicable):
-                        </h4>
-                        
-                        {/* Action Taken Box */}
-                        <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', backgroundColor: '#f9f9f9', borderRadius: '4px', minHeight: '80px' }}>
-                            <p style={{ fontSize: '10pt', margin: '0', color: '#666', fontStyle: 'italic' }}>
-                                Describe actions taken by plant management...
-                            </p>
-                        </div>
-                        
-                        {/* Plant Management Signature */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
-                            <div>
-                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Name</p>
-                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Plant Manager Name</p>
-                            </div>
-                            <div>
-                                <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Signature</p>
-                                <div style={{ borderBottom: '1px solid #000', padding: '8px 0 4px 0', minHeight: '20px' }}></div>
-                                <p style={{ fontSize: '8pt', margin: '4px 0 0 0', color: '#777' }}>Manager Signature</p>
                             </div>
                             <div>
                                 <p style={{ fontSize: '9pt', fontWeight: '600', margin: '0 0 8px 0', color: '#555' }}>Date</p>

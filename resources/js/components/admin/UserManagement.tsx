@@ -173,19 +173,33 @@ export default function UserManagement({
   const handleSaveUser = () => {
     if (editingUser) {
       router.put(`/admin/users/${editingUser.id}`, userForm.data, {
+        preserveScroll: true,
         onSuccess: () => {
           setShowUserModal(false);
           setEditingUser(null);
           userForm.reset();
-          router.reload();
+          
+          // Force a hard refresh to get latest data from server
+          window.location.reload();
+        },
+        onError: (errors) => {
+          // Handle errors if needed
+          console.error('Error updating user:', errors);
         },
       });
     } else {
       router.post("/admin/users", userForm.data, {
+        preserveScroll: true,
         onSuccess: () => {
           setShowUserModal(false);
           userForm.reset();
-          router.reload();
+          
+          // Force a hard refresh to get latest data from server
+          window.location.reload();
+        },
+        onError: (errors) => {
+          // Handle errors if needed
+          console.error('Error adding user:', errors);
         },
       });
     }
@@ -226,6 +240,19 @@ export default function UserManagement({
   const getRandomColor = () => {
     const colors = ["#CD202C", "#8B0000", "#1e40af", "#7c3aed", "#059669"];
     return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  const getRoleBasedColor = (role: User["role"]) => {
+    switch (role) {
+      case "admin":
+        return "#CD202C"; // Red
+      case "inspector":
+        return "#1e40af"; // Blue
+      case "reviewer":
+        return "#7c3aed"; // Purple
+      default:
+        return "#6b7280"; // Gray
+    }
   };
 
   return (
@@ -396,7 +423,7 @@ export default function UserManagement({
                       <div className="flex items-center gap-3">
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium"
-                          style={{ backgroundColor: user.avatarColor || getRandomColor() }}
+                          style={{ backgroundColor: getRoleBasedColor(user.role) }}
                         >
                           {user.name.charAt(0).toUpperCase()}
                         </div>
