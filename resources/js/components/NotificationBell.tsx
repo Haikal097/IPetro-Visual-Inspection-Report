@@ -37,26 +37,34 @@ export default function NotificationBell() {
   const isReviewer = userRole === "reviewer";
   const isAdmin = userRole === "admin";
 
+  function getCsrfToken() {
+    return (
+      (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+        ?.content ?? ""
+    );
+  }
+
   function csrfHeaders() {
     return {
       "X-Requested-With": "XMLHttpRequest",
-      "X-CSRF-TOKEN":
-        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-          ?.content ?? "",
+      "X-CSRF-TOKEN": getCsrfToken(),
     };
   }
 
   useEffect(() => {
-    axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
+    // ✅ Do NOT rely on APP_URL
+    // Always use current browser origin (works for localhost, 127.0.0.1, any domain)
+    const origin = window.location.origin;
 
-    const token =
-      (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-        ?.content ?? "";
-    if (token) axios.defaults.headers.common["X-CSRF-TOKEN"] = token;
-
+    axios.defaults.baseURL = origin;
     axios.defaults.withCredentials = true;
 
-    axios.defaults.baseURL = window.location.origin;
+    axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
+
+    const token = getCsrfToken();
+    if (token) axios.defaults.headers.common["X-CSRF-TOKEN"] = token;
+
+    // optional (helps Sanctum setups)
     axios.defaults.xsrfCookieName = "XSRF-TOKEN";
     axios.defaults.xsrfHeaderName = "X-XSRF-TOKEN";
   }, []);
@@ -64,9 +72,13 @@ export default function NotificationBell() {
   async function load() {
     try {
       setLoading(true);
+
+      // ✅ Use relative URL (never depends on APP_URL)
       const res = await fetch("/notifications", {
         headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
       });
+
       const data = await res.json();
       setUnreadCount(data.unread_count ?? 0);
       setUnread(data.unread ?? []);
@@ -77,34 +89,44 @@ export default function NotificationBell() {
   }
 
   async function markRead(id: string) {
+    // ✅ relative URL
     await fetch(`/notifications/${id}/read`, {
       method: "POST",
       headers: csrfHeaders(),
+      credentials: "same-origin",
     });
     await load();
   }
 
   async function markAllRead() {
+    // ✅ relative URL
     await fetch(`/notifications/read-all`, {
       method: "POST",
       headers: csrfHeaders(),
+      credentials: "same-origin",
     });
     await load();
   }
 
   const resolveTargetUrl = (n: Notif) => {
+    // reviewer goes to review page
     if (isReviewer && n.report_id) return `/review/report/${n.report_id}`;
 
+    // if backend already provides url, use it
     if (n.url) return n.url;
 
+    // report goes to pv-report
     if (n.report_id) return `/pv-report/${n.report_id}`;
 
-    if (n.inspection_id) return `/inspection-calendar?inspection=${n.inspection_id}`;
+    // inspection fallback to calendar
+    if (n.inspection_id)
+      return `/inspection-calendar?inspection=${n.inspection_id}`;
 
     return "/dashboard";
   };
 
   const openNotification = async (n: Notif) => {
+    // ✅ axios uses baseURL=window.origin so no APP_URL needed
     await axios.post(`/notifications/${n.id}/read`, {}, { headers: csrfHeaders() });
     await load();
 
@@ -114,6 +136,7 @@ export default function NotificationBell() {
   };
 
   const setInspectionStatus = async (inspectionId: number, status: string) => {
+    // ✅ axios relative url + baseURL origin
     await axios.put(
       `/inspection-calendar/${inspectionId}/status`,
       { status },
@@ -177,9 +200,18 @@ export default function NotificationBell() {
         className="relative rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
         aria-label="Notifications"
       >
-        <svg className="h-5 w-5 text-gray-700 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+        <svg
+          className="h-5 w-5 text-gray-700 dark:text-gray-200"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"
+          />
         </svg>
 
         {unreadCount > 0 && (
@@ -194,7 +226,9 @@ export default function NotificationBell() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
             <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               Notifications
-              {loading && <span className="text-[10px] text-gray-400">(refreshing)</span>}
+              {loading && (
+                <span className="text-[10px] text-gray-400">(refreshing)</span>
+              )}
             </div>
 
             <button
@@ -273,7 +307,6 @@ export default function NotificationBell() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // ✅ Start = in_progress + go (PV report if url/report_id exists)
                                 setStatusAndGo(n, "in_progress");
                               }}
                               className="text-xs font-semibold px-2 py-1 rounded border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
@@ -285,7 +318,6 @@ export default function NotificationBell() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // ✅ Done = completed (was in_progress before)
                                 setStatusAndGo(n, "completed");
                               }}
                               className="text-xs font-semibold px-2 py-1 rounded border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
@@ -356,7 +388,9 @@ export default function NotificationBell() {
                   {...asButtonProps(() => openNotification(n))}
                   className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900 border-b border-gray-50 dark:border-gray-900 cursor-pointer"
                 >
-                  <div className="text-sm text-gray-900 dark:text-white">{n.title}</div>
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {n.title}
+                  </div>
 
                   {n.message ? (
                     <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
@@ -376,9 +410,16 @@ export default function NotificationBell() {
             )}
           </div>
 
-          <div className={`px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center ${isReviewer ? "justify-end" : "justify-between"}`}>
+          <div
+            className={`px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center ${
+              isReviewer ? "justify-end" : "justify-between"
+            }`}
+          >
             {!isReviewer && (
-              <Link href="/inspection-calendar" className="text-sm font-semibold text-red-600 hover:underline">
+              <Link
+                href="/inspection-calendar"
+                className="text-sm font-semibold text-red-600 hover:underline"
+              >
                 Calendar
               </Link>
             )}
