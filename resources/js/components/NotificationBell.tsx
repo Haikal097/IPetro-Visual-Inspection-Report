@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, router, usePage } from "@inertiajs/react"; // ✅ ADDED usePage
+import { Link, router, usePage } from "@inertiajs/react";
 import axios from "axios";
 
 type Notif = {
@@ -7,7 +7,7 @@ type Notif = {
   title: string;
   type: string;
 
-  // ✅ report notif
+  // report notif
   report_id?: number | null;
   status?: string | null;
   message?: string | null;
@@ -30,10 +30,8 @@ export default function NotificationBell() {
   const [unread, setUnread] = useState<Notif[]>([]);
   const [recent, setRecent] = useState<Notif[]>([]);
   const wrapRef = useRef<HTMLDivElement | null>(null);
-
   const [loading, setLoading] = useState(false);
 
-  // ✅ ADDED: get user role from Inertia props
   const page = usePage() as any;
   const userRole: string | null = page?.props?.auth?.user?.role ?? null;
   const isReviewer = userRole === "reviewer";
@@ -43,26 +41,25 @@ export default function NotificationBell() {
     return {
       "X-Requested-With": "XMLHttpRequest",
       "X-CSRF-TOKEN":
-        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? "",
+        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+          ?.content ?? "",
     };
   }
 
-  // ✅ ADDED (fix 419 for axios calls): set default CSRF headers + cookies once
   useEffect(() => {
     axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
 
     const token =
-      (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? "";
+      (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+        ?.content ?? "";
     if (token) axios.defaults.headers.common["X-CSRF-TOKEN"] = token;
 
     axios.defaults.withCredentials = true;
 
-    // ✅ ADDED
     axios.defaults.baseURL = window.location.origin;
     axios.defaults.xsrfCookieName = "XSRF-TOKEN";
     axios.defaults.xsrfHeaderName = "X-XSRF-TOKEN";
   }, []);
-
 
   async function load() {
     try {
@@ -95,32 +92,24 @@ export default function NotificationBell() {
     await load();
   }
 
-  // ✅ Decide where to go for each notification
   const resolveTargetUrl = (n: Notif) => {
-    // ✅ ADDED: reviewer should NOT go to inspector report pages
     if (isReviewer && n.report_id) return `/review/report/${n.report_id}`;
 
-    // Prefer backend url if provided
     if (n.url) return n.url;
 
-    // ✅ ADDED: if notification has report_id, go PV report (this is what you want for Start)
     if (n.report_id) return `/pv-report/${n.report_id}`;
 
-    // Inspection notification fallback
     if (n.inspection_id) return `/inspection-calendar?inspection=${n.inspection_id}`;
 
-    // fallback
     return "/dashboard";
   };
 
-  const openNotification = async (n: any) => {
+  const openNotification = async (n: Notif) => {
     await axios.post(`/notifications/${n.id}/read`, {}, { headers: csrfHeaders() });
     await load();
 
-    // ✅ ADDED: enforce role-based routing
     const target = resolveTargetUrl(n);
     router.visit(target);
-
     setOpen(false);
   };
 
@@ -133,21 +122,16 @@ export default function NotificationBell() {
     await load();
   };
 
-  // ✅ ADDED: Start/Done helper that updates status AND navigates
+  // ✅ Start/Done helper: update status AND navigate
   const setStatusAndGo = async (n: Notif, status: string) => {
     if (!n.inspection_id) return;
 
-    try {
-      await setInspectionStatus(n.inspection_id, status);
+    await setInspectionStatus(n.inspection_id, status);
 
-      // ✅ If report_id/url exists -> go to PV report to start writing
-      const target = resolveTargetUrl(n);
-      router.visit(target);
+    const target = resolveTargetUrl(n);
+    router.visit(target);
 
-      setOpen(false);
-    } catch (e) {
-      console.error(e);
-    }
+    setOpen(false);
   };
 
   async function refresh() {
@@ -173,7 +157,6 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  // ✅ ADDED (fix nested button warning): helper props to make a div act like a button
   const asButtonProps = (onClick: () => void) => ({
     role: "button" as const,
     tabIndex: 0,
@@ -194,18 +177,9 @@ export default function NotificationBell() {
         className="relative rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
         aria-label="Notifications"
       >
-        <svg
-          className="h-5 w-5 text-gray-700 dark:text-gray-200"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"
-          />
+        <svg className="h-5 w-5 text-gray-700 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
         </svg>
 
         {unreadCount > 0 && (
@@ -299,7 +273,7 @@ export default function NotificationBell() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // ✅ CHANGED BY ADDING: update to in_progress + go to PV report page
+                                // ✅ Start = in_progress + go (PV report if url/report_id exists)
                                 setStatusAndGo(n, "in_progress");
                               }}
                               className="text-xs font-semibold px-2 py-1 rounded border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
@@ -309,14 +283,11 @@ export default function NotificationBell() {
 
                             <button
                               type="button"
-                              onClick={async (e) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                await setInspectionStatus(n.inspection_id!, "in_progress");
-                                const target = resolveTargetUrl(n);
-                                router.visit(target);
-                                setOpen(false);
+                                // ✅ Done = completed (was in_progress before)
+                                setStatusAndGo(n, "completed");
                               }}
-
                               className="text-xs font-semibold px-2 py-1 rounded border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
                             >
                               Done
@@ -405,11 +376,7 @@ export default function NotificationBell() {
             )}
           </div>
 
-          <div
-            className={`px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center ${
-              isReviewer ? "justify-end" : "justify-between"
-            }`}
-          >
+          <div className={`px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center ${isReviewer ? "justify-end" : "justify-between"}`}>
             {!isReviewer && (
               <Link href="/inspection-calendar" className="text-sm font-semibold text-red-600 hover:underline">
                 Calendar
