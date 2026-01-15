@@ -265,7 +265,6 @@ const downloadImagesAsZip = async (items: any[]) => {
   //ai review modal
   const [openAiReview, setOpenAiReview] = useState(false);
 
-
   // Close print preview if open
   useEffect(() => {
     if (showPrintPreview) {
@@ -781,19 +780,39 @@ const downloadImagesAsZip = async (items: any[]) => {
                                   </div>
                                   
                                   {/* Download button - positioned separately, doesn't interfere with modal click */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation(); // Prevent opening modal when clicking download
-                                      const link = document.createElement('a');
-                                      link.href = item.image;
-                                      link.download = `${item.title || `photo-item-${index + 1}`}-${item.id}.jpg`;
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                    }}
-                                    className="absolute -bottom-2 -right-2 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
-                                    title="Download this image"
-                                  >
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        
+                                        // Create absolute URL if relative
+                                        let imageUrl = item.image;
+                                        
+                                        // If URL is relative (starts with /storage/)
+                                        if (imageUrl && imageUrl.startsWith('/storage/')) {
+                                          // Convert to absolute URL
+                                          imageUrl = window.location.origin + imageUrl;
+                                        }
+                                        
+                                        // Check if it's a valid URL
+                                        if (!imageUrl || !imageUrl.startsWith('http')) {
+                                          alert('Invalid image URL. Cannot download.');
+                                          return;
+                                        }
+                                        
+                                        // Create download link
+                                        const link = document.createElement('a');
+                                        link.href = imageUrl;
+                                        link.download = `${item.title || `photo-item-${index + 1}`}-${item.id}.jpg`;
+                                        link.target = '_blank'; // Open in new tab as fallback
+                                        
+                                        // Add to page and click
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      }}
+                                      className="absolute -bottom-2 -right-2 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
+                                      title="Download this image"
+                                    >
                                     <svg 
                                       xmlns="http://www.w3.org/2000/svg" 
                                       className="h-4 w-4" 

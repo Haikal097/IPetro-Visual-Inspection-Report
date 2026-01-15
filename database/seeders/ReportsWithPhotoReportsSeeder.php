@@ -148,7 +148,7 @@ class ReportsWithPhotoReportsSeeder extends Seeder
                 $items = [];
                 for ($k = 1; $k <= $count; $k++) {
                     $tpl = $itemTemplates[array_rand($itemTemplates)];
-                    $img = $baseUrl . "/storage/photos/" . $photoFiles[array_rand($photoFiles)];
+                    $img = "/storage/photos/" . $photoFiles[array_rand($photoFiles)];
 
                     $items[] = [
                         "id" => $k,
