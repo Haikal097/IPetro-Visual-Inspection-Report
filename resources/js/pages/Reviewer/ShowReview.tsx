@@ -914,14 +914,14 @@ const downloadImagesAsZip = async (items: any[]) => {
                           </p>
                         </div>
 
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                        {/*<div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Submitted</p>
                           <p className="font-medium text-sm text-gray-900 dark:text-white">
                             {report.submission_date
                               ? formatDateTime(report.submission_date)
                               : 'Not Submitted'}
                           </p>
-                        </div>
+                        </div>*/}
                       </div>
                     </div>
 

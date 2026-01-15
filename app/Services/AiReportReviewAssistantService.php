@@ -144,7 +144,7 @@ class AiReportReviewAssistantService
                     'title' => $report['title'] ?? null,
                     'status' => $report['status'] ?? null,
                     'creation_date' => $report['creation_date'] ?? null,
-                    'submission_date' => $report['submission_date'] ?? null,
+                    //'submission_date' => $report['submission_date'] ?? null,
                     'signed_at' => $report['signed_at'] ?? null,
                     'json_data' => $report['json_data'] ?? null,
                     'photo_items' => $report['photo_items'] ?? null,
@@ -310,12 +310,12 @@ class AiReportReviewAssistantService
 
         $consistencyIssues = [];
         $status = $report['status'] ?? null;
-        $submission = $report['submission_date'] ?? null;
+        //$submission = $report['submission_date'] ?? null;
         $signedAt = $report['signed_at'] ?? null;
 
-        if ($status === 'in_review' && empty($submission)) {
+        {/*if ($status === 'in_review' && empty($submission)) {
             $consistencyIssues[] = 'Status is in_review but submission_date is empty/null.';
-        }
+        }*/}
 
         $isCompleted = in_array($status, ['approved', 'closed'], true);
         if ($isCompleted && empty($signedAt)) {
@@ -437,7 +437,7 @@ class AiReportReviewAssistantService
         'title' => $report['title'] ?? null,
         'status' => $report['status'] ?? null,
         'creation_date' => $report['creation_date'] ?? null,
-        'submission_date' => $report['submission_date'] ?? null,
+        //'submission_date' => $report['submission_date'] ?? null,
         'signed_at' => $report['signed_at'] ?? null,
     ];
 

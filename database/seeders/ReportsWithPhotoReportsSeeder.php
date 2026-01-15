@@ -120,7 +120,7 @@ class ReportsWithPhotoReportsSeeder extends Seeder
                 // reports insert (PK is report_id)
                 $reportId = DB::table('reports')->insertGetId([
                     "title" => $title,
-                    "creator_id" => 2,
+                    "creator_id" => 6,
                     "reviewer_id" => null,
                     "status" => $status,
                     "creation_date" => Carbon::createFromFormat('Y-m-d', $reportDate)->setTime(rand(8, 20), rand(0, 59), rand(0, 59)),

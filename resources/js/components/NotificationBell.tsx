@@ -424,7 +424,7 @@ export default function NotificationBell() {
               </Link>
             )}
 
-            {isReviewer ? (
+            {false&& isReviewer ? (
               <Link href="/review" className="text-sm font-semibold text-red-600 hover:underline">
                 Reviews
               </Link>
